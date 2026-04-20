@@ -1,0 +1,6 @@
+streamlit
+streamlit-webrtc
+mediapipe
+Pillow
+av
+aiortc
