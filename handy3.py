@@ -1,65 +1,58 @@
 import streamlit as st
 from transformers import pipeline
-from PIL import Image, ImageDraw
+from PIL import Image
 import time
 
 # --- SETUP ---
 st.set_page_config(page_title="Safe Pomodoro", page_icon="🍅")
 
-# Modell laden (DETR ist eine KI-Architektur ohne OpenCV-Zwang)
+# Modell laden - Wir nutzen DETR, weil es KEIN YOLO ist und KEIN OpenCV braucht
 @st.cache_resource
 def load_detector():
-    # Wir laden ein Objekterkennungs-Modell von Hugging Face
+    # Wir laden den Object-Detector explizit
     return pipeline("object-detection", model="facebook/detr-resnet-50")
 
-detector = load_detector()
+# --- APP START ---
+st.title("🍅 KI Pomodoro (No-CV2 / No-YOLO)")
 
-# --- TIMER LOGIK IM SESSION STATE ---
+# Session State initialisieren
 if "start_time" not in st.session_state:
     st.session_state.start_time = None
-if "is_break" not in st.session_state:
-    st.session_state.is_break = False
 
-st.title("🍅 KI Pomodoro (Safe Mode)")
-st.write("Diese Version nutzt keine Grafiktreiber und läuft rein über Python-Logik.")
-
-# --- SIDEBAR ---
+# Sidebar für die Steuerung
 with st.sidebar:
-    st.header("Timer")
-    focus_m = st.slider("Arbeitszeit", 1, 60, 25)
-    if st.button("Start / Reset"):
+    st.header("Timer-Einstellungen")
+    focus_m = st.slider("Fokus-Zeit (Minuten)", 1, 60, 25)
+    if st.button("Timer Start/Reset"):
         st.session_state.start_time = time.time()
-        st.session_state.is_break = False
 
-# --- HAUPTTEIL ---
+# Logik
 if st.session_state.start_time:
     elapsed = time.time() - st.session_state.start_time
-    if elapsed < (focus_m * 60):
-        st.warning("🔥 FOKUS PHASE: Handy-Check aktiv!")
-        st.session_state.is_break = False
+    focus_sec = focus_m * 60
+    
+    if elapsed < focus_sec:
+        remaining = int(focus_sec - elapsed)
+        mins, secs = divmod(remaining, 60)
+        st.metric("Fokus-Zeit übrig", f"{mins:02d}:{secs:02d}")
+        
+        # Kamera-Input (Streamlit nativ)
+        img_file = st.camera_input("Scanner")
+        
+        if img_file:
+            img = Image.open(img_file)
+            detector = load_detector()
+            predictions = detector(img)
+            
+            phone_found = any(res['label'] == 'cell phone' and res['score'] > 0.5 for res in predictions)
+            
+            if phone_found:
+                st.error("🚨 HANDY ERKANNT! Zurück an die Arbeit!")
+            else:
+                st.success("✅ Alles gut! Kein Handy im Fokus.")
     else:
-        st.success("☕ PAUSE: Du darfst dein Handy nutzen.")
-        st.session_state.is_break = True
-
-# Streamlit nativer Kamera-Input (braucht kein webrtc Paket)
-img_file = st.camera_input("Scanner (Bitte lächeln oder Handy zeigen)")
-
-if img_file and not st.session_state.is_break:
-    img = Image.open(img_file)
-    
-    # KI-Analyse
-    with st.spinner('KI prüft auf Handy...'):
-        predictions = detector(img)
-    
-    found_phone = False
-    for res in predictions:
-        # DETR erkennt "cell phone"
-        if res['label'] == 'cell phone' and res['score'] > 0.5:
-            found_phone = True
-            break
-    
-    if found_phone:
-        st.error("🚨 ALARM: HANDY ERKANNT! Leg es sofort weg!")
-        st.audio("https://www.soundjay.com/buttons/beep-01a.mp3") # Optionaler Beep
-    else:
-        st.info("✅ Kein Handy im Bild. Sauber!")
+        st.balloons()
+        st.success("☕ PAUSE! Der Handy-Check ist jetzt deaktiviert.")
+        st.info("Du kannst jetzt dein Handy benutzen, bis du den Timer neu startest.")
+else:
+    st.info("Klicke auf 'Start' in der Sidebar, um die Fokus-Phase zu beginnen.")
