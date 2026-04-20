@@ -1,76 +1,63 @@
 import streamlit as st
+from camera_input_live import camera_input_live
 from transformers import pipeline
 from PIL import Image, ImageOps
 import time
 
-# --- KI MODELL LADEN ---
+# --- KI MODELL (DETR - Kein YOLO!) ---
 @st.cache_resource
 def load_detector():
-    # Wir nutzen DETR (kein YOLO), es ist stabil und erkennt 'cell phone'
     return pipeline("object-detection", model="facebook/detr-resnet-50")
 
 detector = load_detector()
 
-# --- APP SETUP ---
-st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
-st.title("🍅 Automatischer Fokus-Wächter")
+st.set_page_config(page_title="Auto-Fokus Wächter", layout="centered")
+st.title("🍅 Automatischer Pomodoro-Check")
 
-# Session State für den Timer und Status
+# --- TIMER & STATUS ---
 if "active" not in st.session_state:
     st.session_state.active = False
-if "end_time" not in st.session_state:
-    st.session_state.end_time = 0
+if "start_time" not in st.session_state:
+    st.session_state.start_time = 0
 
-# --- SIDEBAR ---
 with st.sidebar:
-    st.header("Einstellungen")
-    minutes = st.number_input("Fokus-Minuten", min_value=1, value=25)
-    if st.button("▶️ Fokus Starten"):
+    st.header("Steuerung")
+    minutes = st.number_input("Fokus-Zeit", min_value=1, value=25)
+    if st.button("▶️ Start"):
         st.session_state.active = True
-        st.session_state.end_time = time.time() + (minutes * 60)
-    
-    if st.button("⏹️ Pause / Stop"):
+        st.session_state.start_time = time.time()
+    if st.button("⏹️ Stop"):
         st.session_state.active = False
 
-# --- HAUPT-LOGIK ---
+# --- AUTOMATISCHE KAMERA-LOGIK ---
 if st.session_state.active:
-    remaining = st.session_state.end_time - time.time()
+    elapsed = time.time() - st.session_state.start_time
+    remaining = (minutes * 60) - elapsed
     
     if remaining > 0:
         mins, secs = divmod(int(remaining), 60)
-        st.metric("Verbleibende Zeit", f"{mins:02d}:{secs:02d}")
-        
-        # DER AUTOMATISMUS:
-        # st.camera_input ist hier der Clou. 
-        # Um es "automatisch" zu machen, nutzen wir eine kurze Anweisung.
-        img_file = st.camera_input("Kamera-Wächter aktiv", label_visibility="visible")
+        st.metric("Restzeit", f"{mins:02d}:{secs:02d}")
 
-        if img_file:
-            img = Image.open(img_file)
+        # Das hier ist der "Magische" Teil: Es nimmt automatisch Bilder auf!
+        image = camera_input_live(show_controls=False)
+
+        if image:
+            img = Image.open(image)
             
-            # KI-Erkennung
-            with st.spinner("KI prüft..."):
-                results = detector(img)
+            # KI-Check (DETR erkennt Handys)
+            results = detector(img)
+            handy_da = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
             
-            # Suche nach dem Label 'cell phone'
-            handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-            
-            if handy_gefunden:
-                st.error("🚨 HANDY ERKANNT! Bitte weglegen!")
-                # Visueller Alarm: Wir zeigen das Bild rot eingefärbt
-                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), caption="Alarm-Zustand!")
+            if handy_da:
+                st.error("🚨 HANDY ERKANNT! Leg es weg!")
+                # Optional: Alarm-Farbe anzeigen
+                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), use_column_width=True)
             else:
-                st.success("✅ Fokus ist sauber. Gut gemacht!")
-        
-        # Kleiner Trick: Die Seite lädt sich alle 10 Sekunden neu, falls kein Bild gemacht wurde
-        # (Optional, aber gut für den Timer-Refresh)
-        time.sleep(1)
-        if int(remaining) % 10 == 0:
-            st.rerun()
-
+                st.success("✅ Fokus aktiv - Kein Handy gefunden.")
+                st.image(img, use_column_width=True)
     else:
         st.session_state.active = False
         st.balloons()
-        st.success("Pause! Du hast es geschafft.")
+        st.success("Zeit um! Genieße deine Pause.")
 else:
-    st.info("Stelle die Zeit ein und klicke auf Start. Während der Pause ist die KI im Ruhezustand.")
+    st.info("Drücke Start, um die automatische Überwachung zu aktivieren.")
