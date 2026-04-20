@@ -2,70 +2,75 @@ import streamlit as st
 from transformers import pipeline
 from PIL import Image, ImageOps
 import time
+import streamlit.components.v1 as components
 
 # --- KI SETUP ---
 @st.cache_resource
 def load_detector():
+    # Wir nehmen DETR - es ist kein YOLO und braucht kein OpenCV/libGL
     return pipeline("object-detection", model="facebook/detr-resnet-50")
 
 detector = load_detector()
 
-st.title("🍅 Automatischer Handy-Wächter")
+st.set_page_config(page_title="Auto-Snap Pomodoro", layout="centered")
+st.title("🍅 Automatischer Pomodoro-Wächter")
 
-# Session State initialisieren
+# --- SESSION STATE ---
 if "active" not in st.session_state:
     st.session_state.active = False
-if "timer_start" not in st.session_state:
-    st.session_state.timer_start = None
 
-# --- SIDEBAR ---
 with st.sidebar:
-    st.header("Einstellungen")
-    minutes = st.number_input("Fokus-Zeit (Min)", min_value=1, value=25)
-    if st.button("▶️ Start"):
+    st.header("Steuerung")
+    if st.button("▶️ Fokus-Phase Starten"):
         st.session_state.active = True
-        st.session_state.timer_start = time.time()
     if st.button("⏹️ Stop"):
         st.session_state.active = False
 
-# --- LOGIK ---
+# --- DER AUTO-CLICKER HACK (JavaScript) ---
+# Dieses Skript sucht den "Take Photo" Button und klickt ihn alle 3 Sekunden
 if st.session_state.active:
-    elapsed = time.time() - st.session_state.timer_start
-    remaining = (minutes * 60) - elapsed
+    components.html(
+        """
+        <script>
+        function clickPhoto() {
+            // Suche alle Buttons auf der Seite
+            const buttons = window.parent.document.querySelectorAll("button");
+            for (const btn of buttons) {
+                // Wenn der Button den Text für das Foto enthält (Streamlit Standard)
+                if (btn.innerText === "Take Photo" || btn.innerText === "Foto aufnehmen") {
+                    btn.click();
+                }
+            }
+        }
+        // Alle 3000ms (3 Sek) klicken
+        setInterval(clickPhoto, 3000);
+        </script>
+        """,
+        height=0,
+    )
+
+# --- HAUPT-ANZEIGE ---
+if st.session_state.active:
+    st.warning("Automatischer Scan läuft alle 3 Sekunden...")
     
-    if remaining > 0:
-        mins, secs = divmod(int(remaining), 60)
-        st.subheader(f"⌛ Zeit übrig: {mins:02d}:{secs:02d}")
+    # Streamlit Kamera Element
+    img_file = st.camera_input("Kamera-Feed")
 
-        # Die Kamera-Komponente
-        # Hinweis: Bei dieser Komponente musst du beim ersten Mal auf "Zulassen" klicken.
-        # Manche Browser blockieren die Kamera, wenn die Seite nicht über HTTPS läuft.
-        img_file = st.camera_input("Scanner läuft...", label_visibility="collapsed")
-
-        if img_file:
-            img = Image.open(img_file)
-            
-            # Analyse
-            with st.spinner("Analysiere..."):
-                results = detector(img)
-            
-            phone_found = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-            
-            if phone_found:
-                st.error("🚨 HANDY GEFUNDEN!")
-                # Sofortiges Feedback
-                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"))
-            else:
-                st.success("✅ Fokus gehalten!")
+    if img_file:
+        img = Image.open(img_file)
         
-        # Der Trick für "Automatik": 
-        # Wir erzwingen alle paar Sekunden einen Rerun, damit das System aktiv bleibt.
-        time.sleep(2)
-        st.rerun()
+        # KI-Erkennung
+        with st.spinner("KI scannt Bild..."):
+            results = detector(img)
         
-    else:
-        st.session_state.active = False
-        st.balloons()
-        st.success("Pause!")
+        handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
+        
+        if handy_gefunden:
+            st.error("🚨 ALARM: HANDY ERKANNT!")
+            # Bild rot einfärben
+            alarm_img = ImageOps.colorize(img.convert("L"), black="red", white="white")
+            st.image(alarm_img, caption="Handy-Sperre aktiv!")
+        else:
+            st.success("✅ Fokus aktiv - Kein Handy zu sehen.")
 else:
-    st.info("Bitte auf Start drücken. Falls kein Kamerabild erscheint, prüfe oben in der Adressleiste deines Browsers, ob die Kamera blockiert wird.")
+    st.info("Klicke in der Sidebar auf Start, um den automatischen Scan zu aktivieren.")
