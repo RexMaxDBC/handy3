@@ -1,58 +1,66 @@
 import streamlit as st
+from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 from transformers import pipeline
 from PIL import Image
+import av
 import time
 
-# --- SETUP ---
-st.set_page_config(page_title="Safe Pomodoro", page_icon="🍅")
-
-# Modell laden - Wir nutzen DETR, weil es KEIN YOLO ist und KEIN OpenCV braucht
+# --- MODELL LADEN ---
 @st.cache_resource
 def load_detector():
-    # Wir laden den Object-Detector explizit
+    # Wir laden das DETR Modell (Kein YOLO, kein OpenCV nötig)
     return pipeline("object-detection", model="facebook/detr-resnet-50")
 
-# --- APP START ---
-st.title("🍅 KI Pomodoro (No-CV2 / No-YOLO)")
+detector = load_detector()
 
-# Session State initialisieren
-if "start_time" not in st.session_state:
-    st.session_state.start_time = None
+# --- STREAMLIT UI ---
+st.set_page_config(page_title="Live Pomodoro AI", layout="wide")
+st.title("🍅 Automatischer Fokus-Wächter")
 
-# Sidebar für die Steuerung
+if "is_break" not in st.session_state:
+    st.session_state.is_break = False
+
 with st.sidebar:
-    st.header("Timer-Einstellungen")
-    focus_m = st.slider("Fokus-Zeit (Minuten)", 1, 60, 25)
-    if st.button("Timer Start/Reset"):
-        st.session_state.start_time = time.time()
+    st.header("Status")
+    mode = st.radio("Modus wählen:", ["Fokus-Phase (Check AN)", "Pause (Check AUS)"])
+    st.session_state.is_break = (mode == "Pause")
+    st.info("Im Fokus-Modus scannt die KI automatisch alle paar Sekunden.")
 
-# Logik
-if st.session_state.start_time:
-    elapsed = time.time() - st.session_state.start_time
-    focus_sec = focus_m * 60
-    
-    if elapsed < focus_sec:
-        remaining = int(focus_sec - elapsed)
-        mins, secs = divmod(remaining, 60)
-        st.metric("Fokus-Zeit übrig", f"{mins:02d}:{secs:02d}")
+# --- LIVE-KI LOGIK ---
+class VideoProcessor(VideoTransformerBase):
+    def __init__(self):
+        self.last_check = 0
+        self.alert = False
+
+    def transform(self, frame):
+        img = frame.to_image() # Konvertiert in PIL Image (Safe!)
         
-        # Kamera-Input (Streamlit nativ)
-        img_file = st.camera_input("Scanner")
-        
-        if img_file:
-            img = Image.open(img_file)
-            detector = load_detector()
+        curr_time = time.time()
+        # Nur alle 2 Sekunden scannen, um den Server nicht zu sprengen
+        if not st.session_state.is_break and (curr_time - self.last_check > 2):
+            self.last_check = curr_time
+            
+            # KI-Analyse
             predictions = detector(img)
+            self.alert = any(res['label'] == 'cell phone' and res['score'] > 0.5 for res in predictions)
+
+        # Wenn Handy erkannt, Bild verändern (z.B. rot färben)
+        if self.alert and not st.session_state.is_break:
+            # Hier nutzen wir PIL statt CV2 zum "Zeichnen"
+            from PIL import ImageOps
+            img = ImageOps.colorize(img.convert("L"), black="red", white="white")
             
-            phone_found = any(res['label'] == 'cell phone' and res['score'] > 0.5 for res in predictions)
-            
-            if phone_found:
-                st.error("🚨 HANDY ERKANNT! Zurück an die Arbeit!")
-            else:
-                st.success("✅ Alles gut! Kein Handy im Fokus.")
-    else:
-        st.balloons()
-        st.success("☕ PAUSE! Der Handy-Check ist jetzt deaktiviert.")
-        st.info("Du kannst jetzt dein Handy benutzen, bis du den Timer neu startest.")
+        return av.VideoFrame.from_image(img)
+
+# --- WEBCAM STREAM ---
+ctx = webrtc_streamer(
+    key="live-fokus",
+    video_transformer_factory=VideoProcessor,
+    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
+    media_stream_constraints={"video": True, "audio": False},
+)
+
+if st.session_state.is_break:
+    st.success("☕ Genieße deine Pause. Die KI ist im Standby.")
 else:
-    st.info("Klicke auf 'Start' in der Sidebar, um die Fokus-Phase zu beginnen.")
+    st.warning("🚨 Fokus aktiv! Sobald ein Handy im Live-Bild erscheint, wird der Stream rot.")
