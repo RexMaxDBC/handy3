@@ -1,6 +1,4 @@
 streamlit
-streamlit-webrtc
-mediapipe
+transformers
+torch
 Pillow
-av
-aiortc
