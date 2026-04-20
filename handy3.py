@@ -1,66 +1,73 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 from transformers import pipeline
 from PIL import Image
-import av
 import time
 
-# --- MODELL LADEN ---
+# --- KI SETUP (DETR Modell - Kein YOLO) ---
 @st.cache_resource
 def load_detector():
-    # Wir laden das DETR Modell (Kein YOLO, kein OpenCV nötig)
     return pipeline("object-detection", model="facebook/detr-resnet-50")
 
 detector = load_detector()
 
-# --- STREAMLIT UI ---
-st.set_page_config(page_title="Live Pomodoro AI", layout="wide")
-st.title("🍅 Automatischer Fokus-Wächter")
+# --- INITIALISIERUNG ---
+if "run" not in st.session_state:
+    st.session_state.run = False
+if "end_time" not in st.session_state:
+    st.session_state.end_time = 0
 
-if "is_break" not in st.session_state:
-    st.session_state.is_break = False
+st.set_page_config(page_title="Pomodoro Wächter", page_icon="🍅")
+st.title("🍅 Simpler Pomodoro Wächter")
 
+# --- SIDEBAR (Einstellungen) ---
 with st.sidebar:
-    st.header("Status")
-    mode = st.radio("Modus wählen:", ["Fokus-Phase (Check AN)", "Pause (Check AUS)"])
-    st.session_state.is_break = (mode == "Pause")
-    st.info("Im Fokus-Modus scannt die KI automatisch alle paar Sekunden.")
-
-# --- LIVE-KI LOGIK ---
-class VideoProcessor(VideoTransformerBase):
-    def __init__(self):
-        self.last_check = 0
-        self.alert = False
-
-    def transform(self, frame):
-        img = frame.to_image() # Konvertiert in PIL Image (Safe!)
+    st.header("Einstellungen")
+    duration = st.slider("Fokus-Dauer (Minuten)", 1, 60, 25)
+    
+    col1, col2 = st.columns(2)
+    if col1.button("▶️ Start"):
+        st.session_state.run = True
+        st.session_state.end_time = time.time() + (duration * 60)
         
-        curr_time = time.time()
-        # Nur alle 2 Sekunden scannen, um den Server nicht zu sprengen
-        if not st.session_state.is_break and (curr_time - self.last_check > 2):
-            self.last_check = curr_time
+    if col2.button("⏹️ Stop/Pause"):
+        st.session_state.run = False
+
+# --- HAUPTTEIL ---
+if st.session_state.run:
+    remaining = st.session_state.end_time - time.time()
+    
+    if remaining > 0:
+        mins, secs = divmod(int(remaining), 60)
+        st.subheader(f"⏳ Verbleibende Zeit: {mins:02d}:{secs:02d}")
+        
+        # Kamera-Input
+        # Hinweis: In dieser simplen Version musst du das Foto kurz bestätigen.
+        # Das spart extrem viel Rechenleistung und verhindert das Aufhängen.
+        img_file = st.camera_input("Handy-Check (Bitte kurz lächeln)")
+
+        if img_file:
+            img = Image.open(img_file)
+            with st.spinner("KI scannt..."):
+                predictions = detector(img)
+                
+            found_phone = any(res['label'] == 'cell phone' and res['score'] > 0.5 for res in predictions)
             
-            # KI-Analyse
-            predictions = detector(img)
-            self.alert = any(res['label'] == 'cell phone' and res['score'] > 0.5 for res in predictions)
-
-        # Wenn Handy erkannt, Bild verändern (z.B. rot färben)
-        if self.alert and not st.session_state.is_break:
-            # Hier nutzen wir PIL statt CV2 zum "Zeichnen"
-            from PIL import ImageOps
-            img = ImageOps.colorize(img.convert("L"), black="red", white="white")
-            
-        return av.VideoFrame.from_image(img)
-
-# --- WEBCAM STREAM ---
-ctx = webrtc_streamer(
-    key="live-fokus",
-    video_transformer_factory=VideoProcessor,
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-    media_stream_constraints={"video": True, "audio": False},
-)
-
-if st.session_state.is_break:
-    st.success("☕ Genieße deine Pause. Die KI ist im Standby.")
+            if found_phone:
+                st.error("🚨 HANDY GEFUNDEN! Leg es sofort weg!")
+                st.audio("https://www.soundjay.com/buttons/beep-01a.mp3")
+            else:
+                st.success("✅ Alles super, kein Handy zu sehen. Weiterarbeiten!")
+    else:
+        st.session_state.run = False
+        st.balloons()
+        st.success("🎉 Zeit abgelaufen! Du hast jetzt Pause.")
 else:
-    st.warning("🚨 Fokus aktiv! Sobald ein Handy im Live-Bild erscheint, wird der Stream rot.")
+    st.info("Stelle die Zeit ein und drücke auf Start. Während der Pause findet kein Check statt.")
+
+# --- INFO FÜR DAS PROJEKT ---
+with st.expander("Wie funktioniert das?"):
+    st.write("""
+    - **KI-Modell:** DETR (Detection Transformer) von Facebook.
+    - **Vorteil:** Es braucht keine Grafiktreiber (libGL) und ist kein YOLO.
+    - **Logik:** Der Handy-Check wird nur ausgeführt, wenn der Timer aktiv ist.
+    """)
