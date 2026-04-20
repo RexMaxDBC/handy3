@@ -1,4 +1,5 @@
 streamlit
+streamlit-camera-input-live
 transformers
 torch
 torchvision
