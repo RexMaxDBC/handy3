@@ -1,82 +1,76 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, VideoTransformerBase
 from transformers import pipeline
 from PIL import Image, ImageOps
-import av
 import time
 
-# --- KI SETUP (Leichtes Modell für Live-Speed) ---
+# --- KI MODELL LADEN ---
 @st.cache_resource
 def load_detector():
-    # Wir nutzen ein sehr schnelles Objekterkennungs-Modell
-    return pipeline("object-detection", model="google/vit-base-patch16-224") 
+    # Wir nutzen DETR (kein YOLO), es ist stabil und erkennt 'cell phone'
+    return pipeline("object-detection", model="facebook/detr-resnet-50")
 
 detector = load_detector()
 
-# --- UI ---
-st.set_page_config(page_title="Live Pomodoro AI", layout="centered")
-st.title("🍅 Live Fokus-Wächter")
+# --- APP SETUP ---
+st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
+st.title("🍅 Automatischer Fokus-Wächter")
 
-# Sidebar für Einstellungen
-with st.sidebar:
-    st.header("Timer")
-    focus_minutes = st.number_input("Fokus-Dauer (Min)", min_value=1, value=25)
-    start_timer = st.button("▶️ Start Fokus")
-    stop_timer = st.button("⏹️ Pause")
-
-if "start_time" not in st.session_state:
-    st.session_state.start_time = None
+# Session State für den Timer und Status
 if "active" not in st.session_state:
     st.session_state.active = False
+if "end_time" not in st.session_state:
+    st.session_state.end_time = 0
 
-if start_timer:
-    st.session_state.start_time = time.time()
-    st.session_state.active = True
-if stop_timer:
-    st.session_state.active = False
-
-# --- LIVE LOGIK ---
-class PhoneGuard(VideoTransformerBase):
-    def __init__(self):
-        self.last_check = 0
-        self.alert = False
-
-    def transform(self, frame):
-        img = frame.to_image()
-        
-        # Nur alle 3 Sekunden scannen, damit die App NICHT hängt
-        now = time.time()
-        if st.session_state.active and (now - self.last_check > 3):
-            self.last_check = now
-            # KI Check
-            predictions = detector(img)
-            # Wir prüfen auf "cell phone" oder ähnliche Labels (je nach Modell)
-            self.alert = any(p['label'] in ['cell phone', 'mobile phone'] and p['score'] > 0.3 for p in predictions)
-
-        # Visuelles Feedback direkt im Stream
-        if self.alert and st.session_state.active:
-            # Das Bild wird rot getönt, wenn das Handy da ist
-            img = ImageOps.colorize(img.convert("L"), black="red", white="white")
-        
-        return av.VideoFrame.from_image(img)
-
-# --- ANZEIGE ---
-if st.session_state.active:
-    elapsed = time.time() - st.session_state.start_time
-    rem = max(0, int((focus_minutes * 60) - elapsed))
-    mins, secs = divmod(rem, 60)
-    st.subheader(f"⏳ Fokus aktiv: {mins:02d}:{secs:02d}")
+# --- SIDEBAR ---
+with st.sidebar:
+    st.header("Einstellungen")
+    minutes = st.number_input("Fokus-Minuten", min_value=1, value=25)
+    if st.button("▶️ Fokus Starten"):
+        st.session_state.active = True
+        st.session_state.end_time = time.time() + (minutes * 60)
     
-    if rem <= 0:
+    if st.button("⏹️ Pause / Stop"):
+        st.session_state.active = False
+
+# --- HAUPT-LOGIK ---
+if st.session_state.active:
+    remaining = st.session_state.end_time - time.time()
+    
+    if remaining > 0:
+        mins, secs = divmod(int(remaining), 60)
+        st.metric("Verbleibende Zeit", f"{mins:02d}:{secs:02d}")
+        
+        # DER AUTOMATISMUS:
+        # st.camera_input ist hier der Clou. 
+        # Um es "automatisch" zu machen, nutzen wir eine kurze Anweisung.
+        img_file = st.camera_input("Kamera-Wächter aktiv", label_visibility="visible")
+
+        if img_file:
+            img = Image.open(img_file)
+            
+            # KI-Erkennung
+            with st.spinner("KI prüft..."):
+                results = detector(img)
+            
+            # Suche nach dem Label 'cell phone'
+            handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
+            
+            if handy_gefunden:
+                st.error("🚨 HANDY ERKANNT! Bitte weglegen!")
+                # Visueller Alarm: Wir zeigen das Bild rot eingefärbt
+                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), caption="Alarm-Zustand!")
+            else:
+                st.success("✅ Fokus ist sauber. Gut gemacht!")
+        
+        # Kleiner Trick: Die Seite lädt sich alle 10 Sekunden neu, falls kein Bild gemacht wurde
+        # (Optional, aber gut für den Timer-Refresh)
+        time.sleep(1)
+        if int(remaining) % 10 == 0:
+            st.rerun()
+
+    else:
         st.session_state.active = False
         st.balloons()
+        st.success("Pause! Du hast es geschafft.")
 else:
-    st.info("Klicke auf Start. In der Pause ist die KI deaktiviert.")
-
-# Der Live-Stream
-webrtc_streamer(
-    key="guard",
-    video_transformer_factory=PhoneGuard,
-    rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]},
-    media_stream_constraints={"video": True, "audio": False},
-)
+    st.info("Stelle die Zeit ein und klicke auf Start. Während der Pause ist die KI im Ruhezustand.")
