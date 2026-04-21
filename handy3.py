@@ -11,57 +11,46 @@ def load_detector():
 
 detector = load_detector()
 
-st.set_page_config(page_title="Pomodoro Clock AI", layout="centered")
+st.title("🍅 Vollautomatischer Pomodoro-Wächter")
 
 # --- SESSION STATE ---
 if "active" not in st.session_state:
     st.session_state.active = False
-if "counter" not in st.session_state:
-    st.session_state.counter = 0
-
-st.title("🍅 Pomodoro AI Wächter")
+if "cam_key" not in st.session_state:
+    st.session_state.cam_key = 0  # Dieser Key erzwingt den Reset
 
 with st.sidebar:
     st.header("Steuerung")
     minutes = st.number_input("Fokus-Zeit (Min)", min_value=1, value=25)
-    if st.button("▶️ Start"):
+    if st.button("▶️ Fokus Starten"):
         st.session_state.active = True
         st.session_state.timer_start = time.time()
     if st.button("⏹️ Stop"):
         st.session_state.active = False
 
-# --- DIE JAVASCRIPT CLOCK ---
-# Dieser Teil erzwingt das Klicken auf die Buttons im Browser-Intervall
+# --- AUTOMATISIERUNG (JavaScript) ---
 if st.session_state.active:
+    # Dieses Skript drückt alle 5 Sekunden auf "Aufnahme"
     components.html(
         """
         <script>
-        function clickCycle() {
-            const parentDoc = window.parent.document;
-            
-            // 1. Suche nach dem Clear-Button (X)
-            const clearBtn = Array.from(parentDoc.querySelectorAll("button")).find(el => 
-                el.innerText === "Clear photo" || el.getAttribute("aria-label") === "Clear photo"
+        function shoot() {
+            const buttons = window.parent.document.querySelectorAll("button");
+            const takeBtn = Array.from(buttons).find(el => 
+                el.innerText.includes("Photo") || el.innerText.includes("aufnehmen")
             );
-            if (clearBtn) clearBtn.click();
-
-            // 2. Warte kurz und klicke dann auf Aufnahme
-            setTimeout(() => {
-                const takeBtn = Array.from(parentDoc.querySelectorAll("button")).find(el => 
-                    el.innerText === "Take Photo" || el.innerText === "Foto aufnehmen"
-                );
-                if (takeBtn) takeBtn.click();
-            }, 1000);
+            if (takeBtn) {
+                takeBtn.click();
+            }
         }
-        
-        // Startet den Zyklus alle 6 Sekunden
-        setInterval(clickCycle, 6000);
+        // Nach 2 Sekunden das erste Foto, dann alle 5 Sek
+        setTimeout(shoot, 2000); 
         </script>
         """,
         height=0,
     )
 
-# --- HAUPTTEIL ---
+# --- HAUPT-LOGIK ---
 if st.session_state.active:
     elapsed = time.time() - st.session_state.timer_start
     remaining = (minutes * 60) - elapsed
@@ -70,65 +59,31 @@ if st.session_state.active:
         mins, secs = divmod(int(remaining), 60)
         st.subheader(f"⌛ Zeit übrig: {mins:02d}:{secs:02d}")
 
-        # Das Kamera-Widget
-        img_file = st.camera_input("Scanner", label_visibility="collapsed")
+        # WICHTIG: Der key ändert sich nach jedem Scan!
+        img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}")
 
         if img_file:
             img = Image.open(img_file)
-            with st.spinner("Prüfe auf Handy..."):
+            with st.spinner("KI prüft..."):
                 results = detector(img)
             
             handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
             
             if handy_gefunden:
                 st.error("🚨 HANDY ERKANNT!")
-                # Visueller Alarm
                 st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"))
             else:
                 st.success("✅ Fokus aktiv!")
-        
-        # Kurze Pause für die Server-Last, dann Refresh
-        time.sleep(1)
-        st.rerun()
-    else:
-        # Hier war der Syntax-Fehler: Jetzt sauber getrennt
-        st.session_state.active = False
-        st.balloons()
-        st.success("🎉 Zeit abgelaufen! Du hast jetzt Pause.")
-else:
-    st.info("Klicke in der Sidebar auf Start. Die Kamera wird dann automatisch gesteuert.")
-# --- HAUPT-ANZEIGE & KI ---
-if st.session_state.active:
-    elapsed = time.time() - st.session_state.timer_start
-    remaining = (minutes * 60) - elapsed
-    
-    if remaining > 0:
-        mins, secs = divmod(int(remaining), 60)
-        st.subheader(f"⌛ Zeit übrig: {mins:02d}:{secs:02d}")
-
-        # Kamera Element
-        img_file = st.camera_input("Kamera-Wächter aktiv", label_visibility="collapsed")
-
-        if img_file:
-            img = Image.open(img_file)
             
-            # KI-Erkennung (DETR)
-            with st.spinner("Analysiere..."):
-                results = detector(img)
+            # DER TRICK: Wir erhöhen den Key und schlafen kurz.
+            # Dadurch wird das camera_input Widget beim nächsten Rerun gelöscht und neu erstellt.
+            st.session_state.cam_key += 1
+            time.sleep(3) # Pause, damit man das Ergebnis kurz sieht
+            st.rerun()
             
-            # Prüfen auf Handy
-            handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-            
-            if handy_gefunden:
-                st.error("🚨 HANDY ERKANNT! Leg es sofort weg!")
-                # Visueller Alarm (Rot-Filter)
-                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), use_column_width=True)
-            else:
-                st.success("✅ Fokus gehalten! Kein Handy im Bild.")
-                st.image(img, use_column_width=True)
     else:
         st.session_state.active = False
         st.balloons()
-        st.success("🎉 Zeit abgelaufen! Du hast jetzt Pause.")
+        st.success("🎉 Pause!")
 else:
-    st.info("Klicke in der Sidebar auf Start. Der automatische Scan beginnt dann sofort.")
+    st.info("Klicke auf Start. Die Kamera macht dann alle 5 Sekunden automatisch ein neues Bild.")
