@@ -23,17 +23,12 @@ if "last_tick" not in st.session_state:
 if "cam_key" not in st.session_state:
     st.session_state.cam_key = 0
 
-st.set_page_config(page_title="Pomofocus AI", layout="centered")
+st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS FÜR LAYOUT UND POSITIONIERUNG ---
+# --- CSS FÜR LAYOUT ---
 st.markdown("""
     <style>
-    /* Hintergrund und Text zentrieren */
-    .main {
-        text-align: center;
-    }
-    
-    /* Buttons wie Pomofocus */
+    .main { text-align: center; }
     .stButton>button {
         border-radius: 5px;
         height: 3em;
@@ -41,42 +36,40 @@ st.markdown("""
         color: white;
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
-
-    /* Kamera-Bereich ganz nach unten verschieben */
+    /* Kamera-Bereich fest am unteren Rand */
     .fixed-bottom {
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
-        background-color: rgba(0, 0, 0, 0.8);
+        background-color: #0e1117;
         padding: 10px;
-        z-index: 999;
+        z-index: 1000;
         border-top: 1px solid #333;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
-    
-    /* Verhindert, dass der Inhalt hinter der Kamera verschwindet */
-    .content-spacer {
-        margin-bottom: 350px;
-    }
+    .spacer { margin-bottom: 400px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- HAUPTINHALT (TIMER) ---
+# --- HAUPTBEREICH (Wird immer angezeigt) ---
 st.title("Pomodoro Wächter")
 
-# Modus-Auswahl
-col1, col2, col3 = st.columns(3)
-with col1:
+# 1. Modus-Buttons
+m_col1, m_col2, m_col3 = st.columns(3)
+with m_col1:
     if st.button("Pomodoro"):
         st.session_state.mode = "Pomodoro"
         st.session_state.remaining_sec = 25 * 60
         st.session_state.active = False
-with col2:
+with m_col2:
     if st.button("Short Break"):
         st.session_state.mode = "Short Break"
         st.session_state.remaining_sec = 5 * 60
         st.session_state.active = False
-with col3:
+with m_col3:
     if st.button("Long Break"):
         st.session_state.mode = "Long Break"
         st.session_state.remaining_sec = 15 * 60
@@ -88,25 +81,26 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
     st.session_state.remaining_sec -= (now - st.session_state.last_tick)
     st.session_state.last_tick = now
 
-# Große Zeitanzeige
+# 2. Große Zeitanzeige
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
-st.markdown(f"<h1 style='text-align: center; font-size: 100px; margin: 20px 0;'>{mins:02d}:{secs:02d}</h1>", unsafe_allow_html=True)
+st.markdown(f"<h1 style='text-align: center; font-size: 80px;'>{mins:02d}:{secs:02d}</h1>", unsafe_allow_html=True)
+st.write(f"Modus: {st.session_state.mode}")
 
-# Start / Stop
+# 3. Start / Stop Button
 button_label = "STOP" if st.session_state.active else "START"
 if st.button(button_label, use_container_width=True):
     st.session_state.active = not st.session_state.active
     st.session_state.last_tick = time.time()
 
-# Platzhalter, damit die Kamera nichts Wichtiges verdeckt
-st.markdown('<div class="content-spacer"></div>', unsafe_allow_html=True)
+# Platzhalter damit nichts verdeckt wird
+st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
-# --- AUTOMATISIERUNG (JavaScript) ---
+# --- AUTOMATISIERUNG ---
 if st.session_state.active and st.session_state.mode == "Pomodoro":
     components.html(
         """
         <script>
-        function forceClick() {
+        function autoClick() {
             const root = window.parent.document;
             const buttons = Array.from(root.querySelectorAll("button"));
             const takeBtn = buttons.find(btn =>
@@ -114,43 +108,39 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
                 btn.innerText.includes("aufnehmen") ||
                 btn.getAttribute("aria-label") === "Take Photo"
             );
-            if (takeBtn) {
-                takeBtn.focus();
-                takeBtn.click();
-            }
+            if (takeBtn) takeBtn.click();
         }
-        setInterval(forceClick, 5000);
+        setInterval(autoClick, 5000);
         </script>
         """,
         height=0,
     )
 
-# --- KAMERA BEREICH AM UNTEREN RAND ---
+# --- KAMERA BEREICH (Am unteren Rand) ---
 if st.session_state.mode == "Pomodoro" and st.session_state.active:
-    # Wir packen alles in ein div mit der Klasse 'fixed-bottom'
     st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
     
+    # Kamera Input
     img_file = st.camera_input("Kamera", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
     
     if img_file:
         img = Image.open(img_file)
         results = detector(img)
-        handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
+        handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
         
-        if handy_gefunden:
+        if handy:
             st.error("Handy erkannt")
-            st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), width=200)
+            st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), width=150)
         else:
             st.success("Fokus aktiv")
-            st.image(img, width=200)
             
         st.session_state.cam_key += 1
-        time.sleep(2)
+        time.sleep(1)
         st.rerun()
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Rerun für flüssige Uhr
+# Rerun für die Uhrzeit
 if st.session_state.active:
     time.sleep(0.1)
     st.rerun()
