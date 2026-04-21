@@ -22,43 +22,25 @@ if "last_tick" not in st.session_state:
     st.session_state.last_tick = time.time()
 if "cam_key" not in st.session_state:
     st.session_state.cam_key = 0
-if "alarm" not in st.session_state:
-    st.session_state.alarm = False
 
-st.set_page_config(page_title="Pomodoro AI Station", layout="centered")
+st.set_page_config(page_title="Pomofocus AI", layout="centered")
 
-# --- DYNAMISCHES CSS (Hintergrundfarbe und Unsichtbarkeit) ---
-# Wenn Alarm aktiv ist, wird der Hintergrund leuchtend rot
-bg_color = "#FF0000" if st.session_state.alarm else "#ba4949"
-
-st.markdown(f"""
+# --- CSS FÜR DESIGN UND AUSBLENDEN DER VORSCHAU ---
+st.markdown("""
     <style>
-    .stApp {{
-        background-color: {bg_color};
-        transition: background-color 0.5s ease;
-    }}
-    /* Versteckt die Kamera-Vorschau und den Button komplett */
-    div[data-testid="stCameraInput"] {{
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0,0,0,0);
-        border: 0;
-    }}
-    .stButton>button {{
+    .stButton>button {
         width: 100%;
         border-radius: 5px;
         height: 3em;
         background-color: rgba(255, 255, 255, 0.2);
         color: white;
         border: none;
-    }}
-    h1, h2, h3, p, span {{
-        color: white !important;
-    }}
+    }
+    /* Dieser Teil versteckt die Kamera-Vorschau fast komplett */
+    [data-testid="stCameraInput"] {
+        position: absolute;
+        left: -10000px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -66,24 +48,22 @@ st.title("Pomodoro Wächter")
 
 # --- MODUS NAVIGATION ---
 col1, col2, col3 = st.columns(3)
+
 with col1:
     if st.button("Pomodoro"):
         st.session_state.mode = "Pomodoro"
         st.session_state.remaining_sec = 25 * 60
         st.session_state.active = False
-        st.session_state.alarm = False
 with col2:
     if st.button("Short Break"):
         st.session_state.mode = "Short Break"
         st.session_state.remaining_sec = 5 * 60
         st.session_state.active = False
-        st.session_state.alarm = False
 with col3:
     if st.button("Long Break"):
         st.session_state.mode = "Long Break"
         st.session_state.remaining_sec = 15 * 60
         st.session_state.active = False
-        st.session_state.alarm = False
 
 # --- TIMER LOGIK ---
 if st.session_state.active and st.session_state.remaining_sec > 0:
@@ -95,19 +75,18 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{mins:02d}:{secs:02d}</h1>", unsafe_allow_html=True)
 
-# --- START / PAUSE BUTTON ---
+# --- START / STOP BUTTON ---
 button_label = "STOP" if st.session_state.active else "START"
 if st.button(button_label, use_container_width=True):
     st.session_state.active = not st.session_state.active
     st.session_state.last_tick = time.time()
-    if not st.session_state.active:
-        st.session_state.alarm = False
 
-# --- AUTOMATISIERUNG (Unsichtbarer Clicker) ---
+# --- AUTOMATISIERUNG (JavaScript) ---
 if st.session_state.active and st.session_state.mode == "Pomodoro":
     components.html(
         """
         <script>
+        const intervalTime = 5000; 
         function forceClick() {
             const root = window.parent.document;
             const buttons = Array.from(root.querySelectorAll("button"));
@@ -121,17 +100,17 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
                 takeBtn.click();
             }
         }
-        setTimeout(forceClick, 4000); 
+        setInterval(forceClick, intervalTime);
         </script>
         """,
         height=0,
     )
 
-# --- VERSTECKTER KAMERA-BEREICH ---
+# --- REINE KI LOGIK OHNE ANZEIGE ---
 if st.session_state.mode == "Pomodoro" and st.session_state.active:
     if st.session_state.remaining_sec > 0:
-        # Widget ist durch CSS versteckt, aber funktional
-        img_file = st.camera_input("versteckt", key=f"cam_{st.session_state.cam_key}")
+        # Kamera ist durch CSS nach links aus dem Sichtfeld geschoben
+        img_file = st.camera_input("Kamera", key=f"cam_{st.session_state.cam_key}")
         
         if img_file:
             img = Image.open(img_file)
@@ -140,13 +119,20 @@ if st.session_state.mode == "Pomodoro" and st.session_state.active:
             handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
             
             if handy_gefunden:
-                st.session_state.alarm = True
-            else:
-                st.session_state.alarm = False
+                st.error("Handy erkannt")
+                # Hier wird KEIN st.image mehr aufgerufen
             
             st.session_state.cam_key += 1
             st.rerun()
     else:
         st.session_state.active = False
-        st.session_state.alarm = False
-        st.balloons()
+        st.success("Fertig")
+elif st.session_state.mode != "Pomodoro" and st.session_state.active:
+    if st.session_state.remaining_sec <= 0:
+        st.session_state.active = False
+        st.success("Pause beendet")
+
+# Rerun für die Zeit-Anzeige
+if st.session_state.active:
+    time.sleep(0.1)
+    st.rerun()
