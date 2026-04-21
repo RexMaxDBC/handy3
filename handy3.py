@@ -70,9 +70,8 @@ if st.session_state.active:
         mins, secs = divmod(int(remaining), 60)
         st.subheader(f"⌛ Zeit übrig: {mins:02d}:{secs:02d}")
 
-        # Das Kamera-Widget wird in einen Container gepackt, den wir kontrollieren
-        cam_container = st.container()
-        img_file = cam_container.camera_input("Scanner", label_visibility="collapsed")
+        # Das Kamera-Widget
+        img_file = st.camera_input("Scanner", label_visibility="collapsed")
 
         if img_file:
             img = Image.open(img_file)
@@ -83,51 +82,21 @@ if st.session_state.active:
             
             if handy_gefunden:
                 st.error("🚨 HANDY ERKANNT!")
+                # Visueller Alarm
                 st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"))
             else:
                 st.success("✅ Fokus aktiv!")
         
-        # Erzwungener Refresh der Seite, um die Clock synchron zu halten
+        # Kurze Pause für die Server-Last, dann Refresh
         time.sleep(1)
         st.rerun()
     else:
+        # Hier war der Syntax-Fehler: Jetzt sauber getrennt
         st.session_state.active = False
         st.balloons()
-        st.success("Pause!")if st.session_state.active:
-    # Dieses Skript drückt erst "Löschen" und dann "Aufnehmen"
-    components.html(
-        """
-        <script>
-        function autoStep() {
-            const buttons = window.parent.document.querySelectorAll("button");
-            
-            // 1. Suche den Clear-Button (X oder Text)
-            for (const btn of buttons) {
-                if (btn.innerText === "Clear photo" || 
-                    btn.innerText === "Foto löschen" || 
-                    btn.getAttribute("aria-label") === "Clear photo") {
-                    btn.click();
-                }
-            }
-
-            // 2. Kurz warten und dann neu schießen
-            setTimeout(() => {
-                const newButtons = window.parent.document.querySelectorAll("button");
-                for (const btn of newButtons) {
-                    if (btn.innerText === "Take Photo" || btn.innerText === "Foto aufnehmen") {
-                        btn.click();
-                    }
-                }
-            }, 600); 
-        }
-
-        // Alle 5 Sekunden wiederholen (gibt der KI genug Zeit)
-        setInterval(autoStep, 5000);
-        </script>
-        """,
-        height=0,
-    )
-
+        st.success("🎉 Zeit abgelaufen! Du hast jetzt Pause.")
+else:
+    st.info("Klicke in der Sidebar auf Start. Die Kamera wird dann automatisch gesteuert.")
 # --- HAUPT-ANZEIGE & KI ---
 if st.session_state.active:
     elapsed = time.time() - st.session_state.timer_start
