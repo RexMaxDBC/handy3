@@ -25,37 +25,63 @@ if "cam_key" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS FÜR LAYOUT ---
+# --- CSS FÜR WEISS-GRÜNES DESIGN ---
 st.markdown("""
     <style>
-    .main { text-align: center; }
-    .stButton>button {
-        border-radius: 5px;
-        height: 3em;
-        background-color: rgba(255, 255, 255, 0.1);
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
+    /* Hintergrund der gesamten App */
+    .stApp {
+        background-color: #f0f7f4;
     }
-    /* Kamera-Bereich fest am unteren Rand */
+    
+    .main { text-align: center; }
+    
+    /* Modus-Buttons */
+    .stButton>button {
+        border-radius: 8px;
+        height: 3em;
+        background-color: #ffffff;
+        color: #2d5a27;
+        border: 2px solid #2d5a27;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+    
+    .stButton>button:hover {
+        background-color: #2d5a27;
+        color: white;
+    }
+
+    /* Große Zeitanzeige */
+    .timer-text {
+        text-align: center; 
+        font-size: 90px; 
+        color: #2d5a27; 
+        font-weight: bold;
+        margin: 20px 0;
+    }
+
+    /* Kamera-Bereich am unteren Rand */
     .fixed-bottom {
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
-        background-color: #0e1117;
-        padding: 10px;
+        background-color: #ffffff;
+        padding: 15px;
         z-index: 1000;
-        border-top: 1px solid #333;
+        border-top: 3px solid #2d5a27;
         display: flex;
         flex-direction: column;
         align-items: center;
+        box-shadow: 0px -5px 15px rgba(0,0,0,0.1);
     }
-    .spacer { margin-bottom: 400px; }
+    
+    .spacer { margin-bottom: 450px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- HAUPTBEREICH (Wird immer angezeigt) ---
-st.title("Pomodoro Wächter")
+# --- HAUPTBEREICH ---
+st.markdown("<h1 style='text-align: center; color: #2d5a27;'>Pomodoro Wächter</h1>", unsafe_allow_html=True)
 
 # 1. Modus-Buttons
 m_col1, m_col2, m_col3 = st.columns(3)
@@ -81,10 +107,10 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
     st.session_state.remaining_sec -= (now - st.session_state.last_tick)
     st.session_state.last_tick = now
 
-# 2. Große Zeitanzeige
+# 2. Zeitanzeige
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
-st.markdown(f"<h1 style='text-align: center; font-size: 80px;'>{mins:02d}:{secs:02d}</h1>", unsafe_allow_html=True)
-st.write(f"Modus: {st.session_state.mode}")
+st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; color: #2d5a27;'>Modus: {st.session_state.mode}</p>", unsafe_allow_html=True)
 
 # 3. Start / Stop Button
 button_label = "STOP" if st.session_state.active else "START"
@@ -92,7 +118,7 @@ if st.button(button_label, use_container_width=True):
     st.session_state.active = not st.session_state.active
     st.session_state.last_tick = time.time()
 
-# Platzhalter damit nichts verdeckt wird
+# Platzhalter
 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
 # --- AUTOMATISIERUNG ---
@@ -116,12 +142,11 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
         height=0,
     )
 
-# --- KAMERA BEREICH (Am unteren Rand) ---
+# --- KAMERA BEREICH ---
 if st.session_state.mode == "Pomodoro" and st.session_state.active:
     st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
     
-    # Kamera Input
-    img_file = st.camera_input("Kamera", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
+    img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
     
     if img_file:
         img = Image.open(img_file)
@@ -140,7 +165,7 @@ if st.session_state.mode == "Pomodoro" and st.session_state.active:
         
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Rerun für die Uhrzeit
+# Rerun
 if st.session_state.active:
     time.sleep(0.1)
     st.rerun()
