@@ -29,27 +29,43 @@ with st.sidebar:
         st.session_state.active = False
 
 # --- AUTOMATISIERUNG (JavaScript) ---
+# --- DER AGGRESSIVE AUTO-CLICKER ---
 if st.session_state.active:
-    # Dieses Skript drückt alle 5 Sekunden auf "Aufnahme"
     components.html(
         """
         <script>
-        function shoot() {
-            const buttons = window.parent.document.querySelectorAll("button");
-            const takeBtn = Array.from(buttons).find(el => 
-                el.innerText.includes("Photo") || el.innerText.includes("aufnehmen")
+        const intervalTime = 5000; // 5 Sekunden
+
+        function forceClick() {
+            // Wir suchen im Hauptfenster (Streamlit App)
+            const root = window.parent.document;
+            
+            // Suche alle Buttons
+            const buttons = Array.from(root.querySelectorAll("button"));
+            
+            // Finde den Aufnahme-Button anhand von Text oder Icon-Aria-Label
+            const takeBtn = buttons.find(btn => 
+                btn.innerText.includes("Photo") || 
+                btn.innerText.includes("aufnehmen") ||
+                btn.getAttribute("aria-label") === "Take Photo"
             );
+
             if (takeBtn) {
+                // Simuliere einen echten Klick
+                takeBtn.focus();
                 takeBtn.click();
+                console.log("KI-Wächter: Foto automatisch ausgelöst");
+            } else {
+                console.log("KI-Wächter: Button noch nicht gefunden...");
             }
         }
-        // Nach 2 Sekunden das erste Foto, dann alle 5 Sek
-        setTimeout(shoot, 2000); 
+
+        // Starte den Loop
+        setInterval(forceClick, intervalTime);
         </script>
         """,
         height=0,
     )
-
 # --- HAUPT-LOGIK ---
 if st.session_state.active:
     elapsed = time.time() - st.session_state.timer_start
