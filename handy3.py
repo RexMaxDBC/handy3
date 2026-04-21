@@ -23,11 +23,14 @@ if "last_tick" not in st.session_state:
 if "cam_key" not in st.session_state:
     st.session_state.cam_key = 0
 
-st.set_page_config(page_title="Pomofocus AI", layout="centered")
+st.set_page_config(page_title="Pomofocus AI Clone", layout="centered")
 
-# --- CSS FÜR DESIGN UND AUSBLENDEN DER VORSCHAU ---
+# --- CSS FÜR DAS DESIGN ---
 st.markdown("""
     <style>
+    .main {
+        text-align: center;
+    }
     .stButton>button {
         width: 100%;
         border-radius: 5px;
@@ -36,10 +39,9 @@ st.markdown("""
         color: white;
         border: none;
     }
-    /* Dieser Teil versteckt die Kamera-Vorschau fast komplett */
-    [data-testid="stCameraInput"] {
-        position: absolute;
-        left: -10000px;
+    /* Versteckt das Vorschaubild der Kamera-Komponente weitestgehend */
+    div[data-testid="stCameraInput"] > label {
+        display: none;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -75,7 +77,7 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{mins:02d}:{secs:02d}</h1>", unsafe_allow_html=True)
 
-# --- START / STOP BUTTON ---
+# --- START / PAUSE BUTTON ---
 button_label = "STOP" if st.session_state.active else "START"
 if st.button(button_label, use_container_width=True):
     st.session_state.active = not st.session_state.active
@@ -106,11 +108,11 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
         height=0,
     )
 
-# --- REINE KI LOGIK OHNE ANZEIGE ---
+# --- KAMERA UND KI BEREICH (Ohne Bildvorschau) ---
 if st.session_state.mode == "Pomodoro" and st.session_state.active:
     if st.session_state.remaining_sec > 0:
-        # Kamera ist durch CSS nach links aus dem Sichtfeld geschoben
-        img_file = st.camera_input("Kamera", key=f"cam_{st.session_state.cam_key}")
+        # Widget muss geladen werden, damit JS klicken kann, aber wir zeigen das Ergebnis nicht an
+        img_file = st.camera_input("Kamera", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
         
         if img_file:
             img = Image.open(img_file)
@@ -119,20 +121,16 @@ if st.session_state.mode == "Pomodoro" and st.session_state.active:
             handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
             
             if handy_gefunden:
-                st.error("Handy erkannt")
-                # Hier wird KEIN st.image mehr aufgerufen
+                st.error("Handy erkannt - Bitte weglegen")
             
             st.session_state.cam_key += 1
+            time.sleep(1)
             st.rerun()
     else:
         st.session_state.active = False
         st.success("Fertig")
-elif st.session_state.mode != "Pomodoro" and st.session_state.active:
-    if st.session_state.remaining_sec <= 0:
-        st.session_state.active = False
-        st.success("Pause beendet")
 
-# Rerun für die Zeit-Anzeige
+# Rerun für die flüssige Zeit-Anzeige
 if st.session_state.active:
     time.sleep(0.1)
     st.rerun()
