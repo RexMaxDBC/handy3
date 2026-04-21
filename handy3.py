@@ -25,58 +25,52 @@ if "cam_key" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS FÜR WEISS-GRÜNES DESIGN ---
+# --- CSS FÜR DAS DESIGN ---
 st.markdown("""
     <style>
-    /* Hintergrund der gesamten App */
     .stApp {
         background-color: #f0f7f4;
     }
-    
     .main { text-align: center; }
     
     /* Modus-Buttons */
     .stButton>button {
         border-radius: 8px;
-        height: 3em;
         background-color: #ffffff;
         color: #2d5a27;
         border: 2px solid #2d5a27;
         font-weight: bold;
-        transition: 0.3s;
     }
     
-    .stButton>button:hover {
-        background-color: #2d5a27;
-        color: white;
-    }
-
-    /* Große Zeitanzeige */
     .timer-text {
         text-align: center; 
-        font-size: 90px; 
+        font-size: 80px; 
         color: #2d5a27; 
         font-weight: bold;
-        margin: 20px 0;
     }
 
-    /* Kamera-Bereich am unteren Rand */
+    /* Kamera-Leiste am unteren Rand */
     .fixed-bottom {
         position: fixed;
         bottom: 0;
         left: 0;
         width: 100%;
         background-color: #ffffff;
-        padding: 15px;
+        padding: 10px;
         z-index: 1000;
         border-top: 3px solid #2d5a27;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
         box-shadow: 0px -5px 15px rgba(0,0,0,0.1);
     }
     
-    .spacer { margin-bottom: 450px; }
+    /* Sorgt dafür, dass die Kamera-Elemente nebeneinander gut aussehen */
+    [data-testid="stVerticalBlock"] > div:has(div.fixed-bottom) {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .spacer { margin-bottom: 300px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -110,7 +104,6 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
 # 2. Zeitanzeige
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: #2d5a27;'>Modus: {st.session_state.mode}</p>", unsafe_allow_html=True)
 
 # 3. Start / Stop Button
 button_label = "STOP" if st.session_state.active else "START"
@@ -142,27 +135,33 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
         height=0,
     )
 
-# --- KAMERA BEREICH ---
+# --- KAMERA BEREICH NEBENEINANDER ---
 if st.session_state.mode == "Pomodoro" and st.session_state.active:
     st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
     
-    img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
+    # Wir nutzen Spalten innerhalb der fixierten Leiste
+    c1, c2 = st.columns([2, 1])
     
-    if img_file:
-        img = Image.open(img_file)
-        results = detector(img)
-        handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-        
-        if handy:
-            st.error("Handy erkannt")
-            st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), width=150)
-        else:
-            st.success("Fokus aktiv")
+    with c1:
+        img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
+    
+    with c2:
+        if img_file:
+            img = Image.open(img_file)
+            results = detector(img)
+            handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
             
-        st.session_state.cam_key += 1
-        time.sleep(1)
-        st.rerun()
-        
+            if handy:
+                st.error("Handy!")
+                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), width=100)
+            else:
+                st.success("OK")
+                st.image(img, width=100)
+            
+            st.session_state.cam_key += 1
+            time.sleep(1)
+            st.rerun()
+            
     st.markdown('</div>', unsafe_allow_html=True)
 
 # Rerun
