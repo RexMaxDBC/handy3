@@ -1,40 +1,99 @@
-import streamlit as st  # <--- Das hat gefehlt!
+import streamlit as st
 from transformers import pipeline
 from PIL import Image, ImageOps
 import time
 import streamlit.components.v1 as components
 
-# --- KI SETUP (DETR Modell) ---
+# --- KI SETUP ---
 @st.cache_resource
 def load_detector():
-    # Lädt das Modell einmalig in den Cache
     return pipeline("object-detection", model="facebook/detr-resnet-50")
 
 detector = load_detector()
 
-# --- SEITEN-LAYOUT ---
-st.set_page_config(page_title="Auto-Snap Pomodoro", layout="centered")
-st.title("🍅 Automatischer Pomodoro-Wächter")
+st.set_page_config(page_title="Pomodoro Clock AI", layout="centered")
 
-# Session State initialisieren
+# --- SESSION STATE ---
 if "active" not in st.session_state:
     st.session_state.active = False
-if "timer_start" not in st.session_state:
-    st.session_state.timer_start = None
+if "counter" not in st.session_state:
+    st.session_state.counter = 0
 
-# --- SIDEBAR STEUERUNG ---
+st.title("🍅 Pomodoro AI Wächter")
+
 with st.sidebar:
     st.header("Steuerung")
     minutes = st.number_input("Fokus-Zeit (Min)", min_value=1, value=25)
-    if st.button("▶️ Fokus Starten"):
+    if st.button("▶️ Start"):
         st.session_state.active = True
         st.session_state.timer_start = time.time()
-    
-    if st.button("⏹️ Stop / Pause"):
+    if st.button("⏹️ Stop"):
         st.session_state.active = False
 
-# --- DER AUTO-CLICKER HACK (JavaScript) ---
+# --- DIE JAVASCRIPT CLOCK ---
+# Dieser Teil erzwingt das Klicken auf die Buttons im Browser-Intervall
 if st.session_state.active:
+    components.html(
+        """
+        <script>
+        function clickCycle() {
+            const parentDoc = window.parent.document;
+            
+            // 1. Suche nach dem Clear-Button (X)
+            const clearBtn = Array.from(parentDoc.querySelectorAll("button")).find(el => 
+                el.innerText === "Clear photo" || el.getAttribute("aria-label") === "Clear photo"
+            );
+            if (clearBtn) clearBtn.click();
+
+            // 2. Warte kurz und klicke dann auf Aufnahme
+            setTimeout(() => {
+                const takeBtn = Array.from(parentDoc.querySelectorAll("button")).find(el => 
+                    el.innerText === "Take Photo" || el.innerText === "Foto aufnehmen"
+                );
+                if (takeBtn) takeBtn.click();
+            }, 1000);
+        }
+        
+        // Startet den Zyklus alle 6 Sekunden
+        setInterval(clickCycle, 6000);
+        </script>
+        """,
+        height=0,
+    )
+
+# --- HAUPTTEIL ---
+if st.session_state.active:
+    elapsed = time.time() - st.session_state.timer_start
+    remaining = (minutes * 60) - elapsed
+    
+    if remaining > 0:
+        mins, secs = divmod(int(remaining), 60)
+        st.subheader(f"⌛ Zeit übrig: {mins:02d}:{secs:02d}")
+
+        # Das Kamera-Widget wird in einen Container gepackt, den wir kontrollieren
+        cam_container = st.container()
+        img_file = cam_container.camera_input("Scanner", label_visibility="collapsed")
+
+        if img_file:
+            img = Image.open(img_file)
+            with st.spinner("Prüfe auf Handy..."):
+                results = detector(img)
+            
+            handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
+            
+            if handy_gefunden:
+                st.error("🚨 HANDY ERKANNT!")
+                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"))
+            else:
+                st.success("✅ Fokus aktiv!")
+        
+        # Erzwungener Refresh der Seite, um die Clock synchron zu halten
+        time.sleep(1)
+        st.rerun()
+    else:
+        st.session_state.active = False
+        st.balloons()
+        st.success("Pause!")if st.session_state.active:
     # Dieses Skript drückt erst "Löschen" und dann "Aufnehmen"
     components.html(
         """
