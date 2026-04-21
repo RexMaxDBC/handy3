@@ -23,14 +23,28 @@ if "last_tick" not in st.session_state:
 if "cam_key" not in st.session_state:
     st.session_state.cam_key = 0
 
-st.set_page_config(page_title="Pomofocus AI Clone", layout="centered")
+st.set_page_config(page_title="Pomodoro AI", layout="centered")
 
-# --- CSS FÜR DAS DESIGN ---
+# --- CSS FÜR DESIGN UND UNSICHTBARE KAMERA ---
 st.markdown("""
     <style>
-    .main {
-        text-align: center;
+    /* Hintergrundfarbe ähnlich wie Pomofocus */
+    .stApp {
+        background-color: #ba4949;
+        color: white;
     }
+    /* Die Kamera-Komponente fast unsichtbar machen */
+    div[data-testid="stCameraInput"] {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 1px;
+        height: 1px;
+        opacity: 0.01;
+        overflow: hidden;
+        pointer-events: none;
+    }
+    /* Buttons Styling */
     .stButton>button {
         width: 100%;
         border-radius: 5px;
@@ -39,14 +53,16 @@ st.markdown("""
         color: white;
         border: none;
     }
+    h1, h2, h3, p {
+        color: white !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("Pomodoro Wächter")
 
-# --- MODUS NAVIGATION (Wie Pomofocus oben) ---
+# --- MODUS NAVIGATION ---
 col1, col2, col3 = st.columns(3)
-
 with col1:
     if st.button("Pomodoro"):
         st.session_state.mode = "Pomodoro"
@@ -73,7 +89,7 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<h1 style='text-align: center; font-size: 100px;'>{mins:02d}:{secs:02d}</h1>", unsafe_allow_html=True)
 
-# --- START / PAUSE BUTTON ---
+# --- START / STOP BUTTON ---
 button_label = "STOP" if st.session_state.active else "START"
 if st.button(button_label, use_container_width=True):
     st.session_state.active = not st.session_state.active
@@ -84,7 +100,6 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
     components.html(
         """
         <script>
-        const intervalTime = 5000; 
         function forceClick() {
             const root = window.parent.document;
             const buttons = Array.from(root.querySelectorAll("button"));
@@ -98,7 +113,8 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
                 takeBtn.click();
             }
         }
-        setInterval(forceClick, intervalTime);
+        // Foto alle 5 Sekunden
+        setInterval(forceClick, 5000);
         </script>
         """,
         height=0,
@@ -107,32 +123,31 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
 # --- KAMERA UND KI BEREICH ---
 if st.session_state.mode == "Pomodoro" and st.session_state.active:
     if st.session_state.remaining_sec > 0:
-        img_file = st.camera_input("Kamera", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
+        # Kamera ist durch CSS oben versteckt
+        img_file = st.camera_input("Kamera", key=f"cam_{st.session_state.cam_key}")
         
         if img_file:
             img = Image.open(img_file)
-            with st.spinner("Prüfe Fokus..."):
-                results = detector(img)
-            
+            results = detector(img)
             handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
             
             if handy_gefunden:
-                st.error("Handy erkannt")
-                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"))
+                # Nur Text-Warnung, keine Bild-Vorschau
+                st.error("Handy erkannt! Bitte konzentrieren.")
             
             st.session_state.cam_key += 1
-            time.sleep(2)
+            # Kleiner Sleep damit der Rerun nicht die UI blockiert
+            time.sleep(1)
             st.rerun()
     else:
         st.session_state.active = False
-        st.success("Fertig")
+        st.success("Arbeitsphase beendet")
 elif st.session_state.mode != "Pomodoro" and st.session_state.active:
-    st.write("Pause aktiv")
     if st.session_state.remaining_sec <= 0:
         st.session_state.active = False
         st.success("Pause beendet")
 
-# Rerun für die flüssige Zeit-Anzeige
+# UI Refresh
 if st.session_state.active:
     time.sleep(0.1)
     st.rerun()
