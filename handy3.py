@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 # --- KI SETUP ---
 @st.cache_resource
 def load_detector():
-    return pipeline("object-detection", model="facebook/detr-resnet-50")
+    return pipeline("object-detection", model="facebook/detr-resnet-50")
 detector = load_detector()
 st.title("Vollautomatischer XXL Pomodoro-Wächter")
 # --- SESSION STATE ---
