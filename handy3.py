@@ -13,91 +13,109 @@ detector = load_detector()
 
 st.title("Vollautomatischer XXL Pomodoro-Wächter")
 
-# --- SESSION STATE ---
+# --- SESSION STATE INITIALISIERUNG ---
 if "active" not in st.session_state:
     st.session_state.active = False
+if "remaining_sec" not in st.session_state:
+    st.session_state.remaining_sec = 25 * 60
+if "last_tick" not in st.session_state:
+    st.session_state.last_tick = time.time()
 if "cam_key" not in st.session_state:
-    st.session_state.cam_key = 0  # Dieser Key erzwingt den Reset
+    st.session_state.cam_key = 0
 
+# --- SIDEBAR: MODI UND STEUERUNG ---
 with st.sidebar:
-    st.header("Steuerung")
-    minutes = st.number_input("Fokus-Zeit (Min)", min_value=1, value=25)
-    if st.button("▶️ Fokus Starten"):
-        st.session_state.active = True
-        st.session_state.timer_start = time.time()
-    if st.button("⏹️ Stop"):
+    st.header("Modus wählen")
+    mode = st.radio("Kategorie:", ["Pomodoro (25 Min)", "Kurze Pause (5 Min)", "Lange Pause (15 Min)"])
+    
+    if st.button("Timer auf gewählten Modus setzen"):
+        if "Pomodoro" in mode:
+            st.session_state.remaining_sec = 25 * 60
+        elif "Kurze" in mode:
+            st.session_state.remaining_sec = 5 * 60
+        else:
+            st.session_state.remaining_sec = 15 * 60
         st.session_state.active = False
 
+    st.divider()
+    st.header("Steuerung")
+    
+    if not st.session_state.active:
+        if st.button("Start / Fortsetzen"):
+            st.session_state.active = True
+            st.session_state.last_tick = time.time()
+    else:
+        if st.button("Anhalten (Pause)"):
+            st.session_state.active = False
+
+# --- TIMER LOGIK ---
+if st.session_state.active and st.session_state.remaining_sec > 0:
+    now = time.time()
+    st.session_state.remaining_sec -= (now - st.session_state.last_tick)
+    st.session_state.last_tick = now
+
 # --- AUTOMATISIERUNG (JavaScript) ---
-# --- DER AGGRESSIVE AUTO-CLICKER ---
-if st.session_state.active:
+# Nur im Pomodoro-Modus und wenn der Timer aktiv ist
+if st.session_state.active and "Pomodoro" in mode:
     components.html(
         """
         <script>
-        const intervalTime = 5000; // 5 Sekunden
+        const intervalTime = 5000; 
         function forceClick() {
-            // Wir suchen im Hauptfenster (Streamlit App)
             const root = window.parent.document;
-            
-            // Suche alle Buttons
             const buttons = Array.from(root.querySelectorAll("button"));
-            
-            // Finde den Aufnahme-Button anhand von Text oder Icon-Aria-Label
             const takeBtn = buttons.find(btn =>
                 btn.innerText.includes("Photo") ||
                 btn.innerText.includes("aufnehmen") ||
                 btn.getAttribute("aria-label") === "Take Photo"
             );
             if (takeBtn) {
-                // Simuliere einen echten Klick
                 takeBtn.focus();
                 takeBtn.click();
-                console.log("KI-Wächter: Foto automatisch ausgelöst");
-            } else {
-                console.log("KI-Wächter: Button noch nicht gefunden...");
             }
         }
-        // Starte den Loop
         setInterval(forceClick, intervalTime);
         </script>
         """,
         height=0,
     )
 
-# --- HAUPT-LOGIK ---
+# --- HAUPT-ANZEIGE ---
+mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
+st.subheader(f"Zeit übrig: {mins:02d}:{secs:02d}")
+st.write(f"Aktueller Modus: {mode}")
+
 if st.session_state.active:
-    elapsed = time.time() - st.session_state.timer_start
-    remaining = (minutes * 60) - elapsed
-    
-    if remaining > 0:
-        mins, secs = divmod(int(remaining), 60)
-        st.subheader(f"⌛ Zeit übrig: {mins:02d}:{secs:02d}")
+    if st.session_state.remaining_sec > 0:
         
-        # WICHTIG: Der key ändert sich nach jedem Scan!
-        img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}")
-        
-        if img_file:
-            img = Image.open(img_file)
-            with st.spinner("KI prüft..."):
-                results = detector(img)
+        # Kamera nur im Pomodoro-Modus anzeigen
+        if "Pomodoro" in mode:
+            img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}")
             
-            handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-            
-            if handy_gefunden:
-                st.error("🚨 HANDY ERKANNT!")
-                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"))
-            else:
-                st.success("✅ Fokus aktiv!")
-            
-            # DER TRICK: Wir erhöhen den Key und schlafen kurz.
-            # Dadurch wird das camera_input Widget beim nächsten Rerun gelöscht und neu erstellt.
-            st.session_state.cam_key += 1
-            time.sleep(3)  # Pause, damit man das Ergebnis kurz sieht
+            if img_file:
+                img = Image.open(img_file)
+                with st.spinner("KI prüft..."):
+                    results = detector(img)
+                
+                handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
+                
+                if handy_gefunden:
+                    st.error("HANDY ERKANNT!")
+                    st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"))
+                else:
+                    st.success("Fokus aktiv!")
+                
+                st.session_state.cam_key += 1
+                time.sleep(3)
+                st.rerun()
+        else:
+            st.info("Pausenzeit: Kamera-Überwachung ist deaktiviert.")
+            time.sleep(1)
             st.rerun()
             
     else:
         st.session_state.active = False
         st.balloons()
-        st.success("🎉 Pause!")
+        st.success("Zeit abgelaufen.")
 else:
-    st.info("Klicke auf Start. Die Kamera macht dann alle 5 Sekunden automatisch ein neues Bild.")
+    st.info("Timer pausiert oder inaktiv. Klicke auf Start in der Sidebar.")
