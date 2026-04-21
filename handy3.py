@@ -11,7 +11,7 @@ def load_detector():
 
 detector = load_detector()
 
-st.title("🍅 Vollautomatischer Pomodoro-Wächter")
+st.title("Vollautomatischer XXL Pomodoro-Wächter")
 
 # --- SESSION STATE ---
 if "active" not in st.session_state:
