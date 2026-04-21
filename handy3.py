@@ -11,95 +11,98 @@ def load_detector():
 
 detector = load_detector()
 
-st.title("Vollautomatischer XXL Pomodoro-Wächter")
+st.set_page_config(page_title="Pomodoro AI Station", layout="centered")
+st.title("Pomodoro AI Station")
 
-# --- SESSION STATE ---
-if "active" not in st.session_state:
-    st.session_state.active = False
+# --- SESSION STATE INITIALISIERUNG ---
+if "running" not in st.session_state:
+    st.session_state.running = False
+if "remaining_sec" not in st.session_state:
+    st.session_state.remaining_sec = 25 * 60
+if "last_tick" not in st.session_state:
+    st.session_state.last_tick = time.time()
 if "cam_key" not in st.session_state:
-    st.session_state.cam_key = 0  # Dieser Key erzwingt den Reset
+    st.session_state.cam_key = 0
 
+# --- SIDEBAR: KATEGORIEN & STEUERUNG ---
 with st.sidebar:
-    st.header("Steuerung")
-    minutes = st.number_input("Fokus-Zeit (Min)", min_value=1, value=25)
-    if st.button("▶️ Fokus Starten"):
-        st.session_state.active = True
-        st.session_state.timer_start = time.time()
-    if st.button("⏹️ Stop"):
-        st.session_state.active = False
+    st.header("Modus wählen")
+    mode = st.radio("Kategorie:", ["Pomodoro (25 Min)", "Kurze Pause (5 Min)", "Lange Pause (15 Min)"])
+    
+    if st.button("Timer auf gewählten Modus zurücksetzen"):
+        if "Pomodoro" in mode: st.session_state.remaining_sec = 25 * 60
+        elif "Kurze" in mode: st.session_state.remaining_sec = 5 * 60
+        else: st.session_state.remaining_sec = 15 * 60
+        st.session_state.running = False
 
-# --- AUTOMATISIERUNG (JavaScript) ---
-# --- DER AGGRESSIVE AUTO-CLICKER ---
-if st.session_state.active:
+    st.divider()
+    st.header("Steuerung")
+    
+    if not st.session_state.running:
+        if st.button("Start / Fortsetzen"):
+            st.session_state.running = True
+            st.session_state.last_tick = time.time()
+    else:
+        if st.button("Pause"):
+            st.session_state.running = False
+
+# --- TIMER LOGIK ---
+if st.session_state.running and st.session_state.remaining_sec > 0:
+    now = time.time()
+    st.session_state.remaining_sec -= (now - st.session_state.last_tick)
+    st.session_state.last_tick = now
+
+# --- ANZEIGE ---
+mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
+st.metric(label=f"Modus: {mode}", value=f"{mins:02d}:{secs:02d}")
+
+# --- AUTOMATISIERUNG (JavaScript für Auto-Snap) ---
+if st.session_state.running and "Pomodoro" in mode:
     components.html(
         """
         <script>
-        const intervalTime = 5000; // 5 Sekunden
-
-        function forceClick() {
-            // Wir suchen im Hauptfenster (Streamlit App)
+        function autoSnap() {
             const root = window.parent.document;
-            
-            // Suche alle Buttons
             const buttons = Array.from(root.querySelectorAll("button"));
-            
-            // Finde den Aufnahme-Button anhand von Text oder Icon-Aria-Label
             const takeBtn = buttons.find(btn => 
                 btn.innerText.includes("Photo") || 
                 btn.innerText.includes("aufnehmen") ||
                 btn.getAttribute("aria-label") === "Take Photo"
             );
-
-            if (takeBtn) {
-                // Simuliere einen echten Klick
-                takeBtn.focus();
-                takeBtn.click();
-                console.log("KI-Wächter: Foto automatisch ausgelöst");
-            } else {
-                console.log("KI-Wächter: Button noch nicht gefunden...");
-            }
+            if (takeBtn) takeBtn.click();
         }
-
-        // Starte den Loop
-        setInterval(forceClick, intervalTime);
+        setTimeout(autoSnap, 4000); 
         </script>
         """,
         height=0,
     )
-# --- HAUPT-LOGIK ---
-if st.session_state.active:
-    elapsed = time.time() - st.session_state.timer_start
-    remaining = (minutes * 60) - elapsed
-    
-    if remaining > 0:
-        mins, secs = divmod(int(remaining), 60)
-        st.subheader(f"⌛ Zeit übrig: {mins:02d}:{secs:02d}")
 
-        # WICHTIG: Der key ändert sich nach jedem Scan!
-        img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}")
+# --- KI & KAMERA ---
+if "Pomodoro" in mode and st.session_state.running:
+    if st.session_state.remaining_sec > 0:
+        img_file = st.camera_input("Handy-Check aktiv", key=f"cam_{st.session_state.cam_key}")
 
         if img_file:
             img = Image.open(img_file)
-            with st.spinner("KI prüft..."):
-                results = detector(img)
+            results = detector(img)
+            handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
             
-            handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-            
-            if handy_gefunden:
-                st.error("🚨 HANDY ERKANNT!")
+            if handy:
+                st.error("Handy erkannt! Bitte weglegen.")
                 st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"))
-            else:
-                st.success("✅ Fokus aktiv!")
             
-            # DER TRICK: Wir erhöhen den Key und schlafen kurz.
-            # Dadurch wird das camera_input Widget beim nächsten Rerun gelöscht und neu erstellt.
             st.session_state.cam_key += 1
-            time.sleep(3) # Pause, damit man das Ergebnis kurz sieht
+            time.sleep(2)
             st.rerun()
-            
     else:
-        st.session_state.active = False
-        st.balloons()
-        st.success("🎉 Pause!")
-else:
-    st.info("Klicke auf Start. Die Kamera macht dann alle 5 Sekunden automatisch ein neues Bild.")
+        st.session_state.running = False
+        st.success("Arbeitsphase beendet.")
+elif not "Pomodoro" in mode and st.session_state.running:
+    st.info("Pausen-Modus: Kamera-Überwachung deaktiviert.")
+    if st.session_state.remaining_sec <= 0:
+        st.session_state.running = False
+        st.success("Pause beendet.")
+
+if st.session_state.running:
+    time.sleep(0.1)
+    st.rerun()
