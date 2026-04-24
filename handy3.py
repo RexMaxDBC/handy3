@@ -35,26 +35,25 @@ st.markdown(f"""
         transition: background-color 0.3s ease;
     }}
     
-    /* Container für die Überschrift, um Streamlit-Offsets zu umgehen */
+    /* Container für die Überschrift - Balken entfernt */
     .header-container {{
         width: 100%;
         display: flex;
         justify-content: center;
         align-items: center;
-        margin-top: -50px; /* Zieht den Titel etwas höher */
-        margin-bottom: 20px;
+        margin-top: -50px; 
+        margin-bottom: 30px;
     }}
 
     .title-text {{
         color: white;
         opacity: 0.9;
         font-weight: bold;
-        font-size: 2.5rem;
+        font-size: 2.8rem;
         text-align: center;
         margin: 0;
         padding: 0;
-        border-bottom: 2px solid rgba(255,255,255,0.1); /* Eleganter Unterstrich */
-        padding-bottom: 10px;
+        border: none; /* Stellt sicher, dass kein Rahmen da ist */
     }}
 
     /* Modus Buttons */
@@ -110,7 +109,6 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 # --- HAUPTBEREICH ---
-# Die Überschrift wird jetzt in einen dedizierten Header-Container gepackt
 st.markdown("<div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div>", unsafe_allow_html=True)
 
 # 1. Modus-Buttons
