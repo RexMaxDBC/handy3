@@ -27,24 +27,26 @@ if "bg_color" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS FÜR DAS LAYOUT ---
-st.markdown(f"""
-    <style>
+# --- CSS BLOCK (Korrekt eingerückt) ---
+css = f"""
+<style>
     .stApp {{
         background-color: {st.session_state.bg_color};
         transition: background-color 0.3s ease;
     }}
     
-    /* Äußerer Wrapper - margin-top reduziert, damit der Kasten sichtbar bleibt */
+    /* Haupt-Container nach oben rücken ohne negativen Margin-Fehler */
+    .block-container {{
+        padding-top: 2rem !important;
+    }}
+
     .header-wrapper {{
         width: 100%;
         display: flex;
         justify-content: center;
-        margin-top: -30px; 
         margin-bottom: 25px;
     }}
 
-    /* Der flache, kompakte graue Kasten */
     .header-container {{
         display: inline-flex;
         justify-content: center;
@@ -53,7 +55,6 @@ st.markdown(f"""
         border-radius: 8px;       
         padding: 4px 18px;
         background-color: rgba(211, 211, 211, 0.12);
-        width: fit-content;
     }}
 
     .title-text {{
@@ -63,11 +64,8 @@ st.markdown(f"""
         font-size: 1.7rem;
         text-align: center;
         margin: 0;
-        padding: 0;
-        line-height: 1.1;
     }}
 
-    /* Modus Buttons */
     .stButton>button {{
         border-radius: 5px;
         background-color: rgba(255, 255, 255, 0.15);
@@ -76,32 +74,25 @@ st.markdown(f"""
         font-weight: bold;
     }}
     
-    /* START/STOP Button */
     div.stButton > button:last-child {{
         background-color: white !important;
         color: {st.session_state.bg_color} !important;
-        font-size: 25px !important;
+        font-size: 22px !important;
         font-weight: bold !important;
-        height: 60px !important;
-        width: 200px !important;
-        border: none !important;
-        box-shadow: rgba(0, 0, 0, 0.2) 0px 6px 0px;
+        height: 55px !important;
+        width: 180px !important;
         margin: 20px auto !important;
         display: block !important;
-    }}
-    
-    div.stButton > button:active {{
-        transform: translateY(4px);
-        box-shadow: none !important;
+        box-shadow: rgba(0, 0, 0, 0.2) 0px 5px 0px;
     }}
 
     .timer-text {{
         text-align: center; 
-        font-size: 130px; 
+        font-size: 120px; 
         color: white; 
         font-weight: bold;
         margin: 10px 0;
-        font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;
+        font-family: sans-serif;
     }}
 
     .fixed-bottom {{
@@ -113,12 +104,11 @@ st.markdown(f"""
         padding: 10px;
         z-index: 1000;
     }}
-    
-    .spacer {{ margin-bottom: 350px; }}
-    </style>
-    """, unsafe_allow_html=True)
+</style>
+"""
+st.markdown(css, unsafe_allow_html=True)
 
-# --- HAUPTBEREICH ---
+# --- INHALT ---
 st.markdown("""
     <div class='header-wrapper'>
         <div class='header-container'>
@@ -127,272 +117,46 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-# 1. Modus-Buttons
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
 with m_col1:
     if st.button("Pomodoro", use_container_width=True):
-        st.session_state.mode = "Pomodoro"
-        st.session_state.remaining_sec = 25 * 60
-        st.session_state.active = False
-        st.session_state.bg_color = "#2d5a27"
+        st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Pomodoro", 25*60, "#2d5a27"
 with m_col2:
     if st.button("Short", use_container_width=True):
-        st.session_state.mode = "Short Break"
-        st.session_state.remaining_sec = 5 * 60
-        st.session_state.active = False
-        st.session_state.bg_color = "#457b9d"
+        st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Short Break", 5*60, "#457b9d"
 with m_col3:
     if st.button("Long", use_container_width=True):
-        st.session_state.mode = "Long Break"
-        st.session_state.remaining_sec = 15 * 60
-        st.session_state.active = False
-        st.session_state.bg_color = "#457b9d"
+        st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Long Break", 15*60, "#457b9d"
 
-# Timer Logik
 if st.session_state.active and st.session_state.remaining_sec > 0:
     now = time.time()
     st.session_state.remaining_sec -= (now - st.session_state.last_tick)
     st.session_state.last_tick = now
 
-# 2. Zeitanzeige
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
 
-# 3. Start / Stop Button
 _, btn_center, _ = st.columns([0.5, 1, 0.5])
 with btn_center:
-    button_label = "STOP" if st.session_state.active else "START"
-    if st.button(button_label, use_container_width=True):
+    if st.button("STOP" if st.session_state.active else "START", use_container_width=True):
         st.session_state.active = not st.session_state.active
         st.session_state.last_tick = time.time()
-        if not st.session_state.active:
-             st.session_state.bg_color = "#2d5a27" if "Pomodoro" in st.session_state.mode else "#457b9d"
 
-st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-
-# --- JS AUTOMATISIERUNG ---
+# --- KAMERA & LOGIK ---
 if st.session_state.active and "Pomodoro" in st.session_state.mode:
-    components.html(
-        """
-        <script>
-        function autoSnap() {
-            const root = window.parent.document;
-            const buttons = Array.from(root.querySelectorAll("button"));
-            const takeBtn = buttons.find(btn =>
-                btn.innerText.includes("Photo") ||
-                btn.innerText.includes("aufnehmen") ||
-                btn.getAttribute("aria-label") === "Take Photo"
-            );
-            if (takeBtn) takeBtn.click();
-        }
-        setInterval(autoSnap, 5000);
-        </script>
-        """,
-        height=0,
-    )
-
-# --- KAMERA BEREICH ---
-if "Pomodoro" in st.session_state.mode and st.session_state.active:
+    components.html("<script>setInterval(() => { const b = Array.from(window.parent.document.querySelectorAll('button')).find(x => x.innerText.includes('Photo')); if(b) b.click(); }, 5000);</script>", height=0)
     st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
     c1, c2 = st.columns([2, 1])
     with c1:
-        img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
+        img_file = st.camera_input("Scanner", key=f"c_{st.session_state.cam_key}", label_visibility="collapsed")
     with c2:
         if img_file:
             img = Image.open(img_file)
-            results = detector(img)
-            handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-            if handy:
-                st.session_state.bg_color = "#ba4949"
-                st.error("Handy!")
-                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), width=100)
-            else:
-                st.session_state.bg_color = "#2d5a27"
-                st.image(img, width=100)
+            handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in detector(img))
+            st.session_state.bg_color = "#ba4949" if handy else "#2d5a27"
+            st.image(img if not handy else ImageOps.colorize(img.convert("L"), "red", "white"), width=100)
             st.session_state.cam_key += 1
-            time.sleep(1)
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-if st.session_state.active:
-    time.sleep(0.1)
-    st.rerun()    
-    /* Äußerer Wrapper für die Zentrierung */
-    .header-wrapper {{
-        width: 100%;
-        display: flex;
-        justify-content: center;
-        margin-top: -70px; 
-        margin-bottom: 20px;
-    }}
-
-    /* Der flache, kompakte graue Kasten */
-    .header-container {{
-        display: inline-flex;
-        justify-content: center;
-        align-items: center;
-        border: 1.5px solid #D3D3D3; 
-        border-radius: 8px;       
-        padding: 2px 15px;
-        background-color: rgba(211, 211, 211, 0.08);
-        width: fit-content;
-    }}
-
-    .title-text {{
-        color: white;
-        opacity: 0.9;
-        font-weight: bold;
-        font-size: 1.6rem;
-        text-align: center;
-        margin: 0;
-        padding: 0;
-        line-height: 1.1;
-    }}
-
-    /* Modus Buttons */
-    .stButton>button {{
-        border-radius: 5px;
-        background-color: rgba(255, 255, 255, 0.15);
-        color: white;
-        border: none;
-        font-weight: bold;
-    }}
-    
-    /* START/STOP Button */
-    div.stButton > button:last-child {{
-        background-color: white !important;
-        color: {st.session_state.bg_color} !important;
-        font-size: 25px !important;
-        font-weight: bold !important;
-        height: 60px !important;
-        width: 200px !important;
-        border: none !important;
-        box-shadow: rgba(0, 0, 0, 0.2) 0px 6px 0px;
-        margin: 20px auto !important;
-        display: block !important;
-    }}
-    
-    div.stButton > button:active {{
-        transform: translateY(4px);
-        box-shadow: none !important;
-    }}
-
-    .timer-text {{
-        text-align: center; 
-        font-size: 130px; 
-        color: white; 
-        font-weight: bold;
-        margin: 5px 0;
-        font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;
-    }}
-
-    .fixed-bottom {{
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        background-color: rgba(255, 255, 255, 0.95);
-        padding: 10px;
-        z-index: 1000;
-    }}
-    
-    .spacer {{ margin-bottom: 350px; }}
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- HAUPTBEREICH ---
-st.markdown("""
-    <div class='header-wrapper'>
-        <div class='header-container'>
-            <h1 class='title-text'>Pomodoro Wächter</h1>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# 1. Modus-Buttons
-m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
-with m_col1:
-    if st.button("Pomodoro", use_container_width=True):
-        st.session_state.mode = "Pomodoro"
-        st.session_state.remaining_sec = 25 * 60
-        st.session_state.active = False
-        st.session_state.bg_color = "#2d5a27"
-with m_col2:
-    if st.button("Short", use_container_width=True):
-        st.session_state.mode = "Short Break"
-        st.session_state.remaining_sec = 5 * 60
-        st.session_state.active = False
-        st.session_state.bg_color = "#457b9d"
-with m_col3:
-    if st.button("Long", use_container_width=True):
-        st.session_state.mode = "Long Break"
-        st.session_state.remaining_sec = 15 * 60
-        st.session_state.active = False
-        st.session_state.bg_color = "#457b9d"
-
-# Timer Logik
-if st.session_state.active and st.session_state.remaining_sec > 0:
-    now = time.time()
-    st.session_state.remaining_sec -= (now - st.session_state.last_tick)
-    st.session_state.last_tick = now
-
-# 2. Zeitanzeige
-mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
-st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
-
-# 3. Start / Stop Button
-_, btn_center, _ = st.columns([0.5, 1, 0.5])
-with btn_center:
-    button_label = "STOP" if st.session_state.active else "START"
-    if st.button(button_label, use_container_width=True):
-        st.session_state.active = not st.session_state.active
-        st.session_state.last_tick = time.time()
-        if not st.session_state.active:
-             st.session_state.bg_color = "#2d5a27" if "Pomodoro" in st.session_state.mode else "#457b9d"
-
-st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-
-# --- JS AUTOMATISIERUNG ---
-if st.session_state.active and "Pomodoro" in st.session_state.mode:
-    components.html(
-        """
-        <script>
-        function autoSnap() {
-            const root = window.parent.document;
-            const buttons = Array.from(root.querySelectorAll("button"));
-            const takeBtn = buttons.find(btn =>
-                btn.innerText.includes("Photo") ||
-                btn.innerText.includes("aufnehmen") ||
-                btn.getAttribute("aria-label") === "Take Photo"
-            );
-            if (takeBtn) takeBtn.click();
-        }
-        setInterval(autoSnap, 5000);
-        </script>
-        """,
-        height=0,
-    )
-
-# --- KAMERA BEREICH ---
-if "Pomodoro" in st.session_state.mode and st.session_state.active:
-    st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        img_file = st.camera_input("Scanner", key=f"cam_{st.session_state.cam_key}", label_visibility="collapsed")
-    with c2:
-        if img_file:
-            img = Image.open(img_file)
-            results = detector(img)
-            handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-            if handy:
-                st.session_state.bg_color = "#ba4949"
-                st.error("Handy!")
-                st.image(ImageOps.colorize(img.convert("L"), black="red", white="white"), width=100)
-            else:
-                st.session_state.bg_color = "#2d5a27"
-                st.image(img, width=100)
-            st.session_state.cam_key += 1
-            time.sleep(1)
+            time.sleep(0.5)
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
