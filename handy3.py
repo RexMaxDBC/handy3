@@ -27,7 +27,7 @@ if "bg_color" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS FÜR PERFEKTE ZENTRIERUNG UND GRAUEN KASTEN ---
+# --- CSS FÜR PERFEKTE ZENTRIERUNG UND KOMPAKTEN GRAUEN KASTEN ---
 st.markdown(f"""
     <style>
     .stApp {{
@@ -35,30 +35,36 @@ st.markdown(f"""
         transition: background-color 0.3s ease;
     }}
     
-    /* Container für die Überschrift - Jetzt in Hellgrau */
-    .header-container {{
+    /* Äußerer Container für die Zentrierung */
+    .header-wrapper {{
         width: 100%;
         display: flex;
         justify-content: center;
-        align-items: center;
         margin-top: -50px; 
         margin-bottom: 30px;
-        /* Grauer Kasten */
-        border: 2px solid #D3D3D3; /* Hellgrauer Rand, etwas dünner für Eleganz */
-        border-radius: 12px;       /* Leicht abgerundet */
-        padding: 8px 25px;         /* Innenabstand */
-        background-color: rgba(211, 211, 211, 0.1); /* Sehr dezenter grauer Schimmer */
+    }}
+
+    /* Der kompakte graue Kasten */
+    .header-container {{
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        /* Grauer Kasten - Kompakt */
+        border: 2px solid #D3D3D3; 
+        border-radius: 10px;       
+        padding: 5px 20px;         
+        background-color: rgba(211, 211, 211, 0.1);
+        width: fit-content; /* Kasten passt sich der Textbreite an */
     }}
 
     .title-text {{
         color: white;
         opacity: 0.95;
         font-weight: bold;
-        font-size: 2.6rem;
+        font-size: 2.2rem; /* Etwas kleiner für den kompakten Look */
         text-align: center;
         margin: 0;
         padding: 0;
-        border: none;
     }}
 
     /* Modus Buttons */
@@ -77,7 +83,7 @@ st.markdown(f"""
         font-size: 25px !important;
         font-weight: bold !important;
         height: 65px !important;
-        width: 220px !important;
+        width: 200px !important;
         border: none !important;
         box-shadow: rgba(0, 0, 0, 0.2) 0px 6px 0px;
         margin: 30px auto !important;
@@ -114,7 +120,14 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 # --- HAUPTBEREICH ---
-st.markdown("<div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div>", unsafe_allow_html=True)
+# Struktur: Wrapper zentriert den Container, Container schließt den Text eng ein
+st.markdown("""
+    <div class='header-wrapper'>
+        <div class='header-container'>
+            <h1 class='title-text'>Pomodoro Wächter</h1>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # 1. Modus-Buttons
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
