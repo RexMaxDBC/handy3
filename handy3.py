@@ -25,7 +25,7 @@ if "cam_key" not in st.session_state:
 if "bg_color" not in st.session_state:
     st.session_state.bg_color = "#2d5a27" 
 
-st.set_page_config(page_title="Pomodoro Wächter", layout="wide")
+st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
 # --- CSS FÜR PERFEKTE ZENTRIERUNG ---
 st.markdown(f"""
@@ -35,33 +35,41 @@ st.markdown(f"""
         transition: background-color 0.3s ease;
     }}
     
-    /* Zentriert den gesamten Inhalt der App */
-    .block-container {{
+    .main-box {{
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding-top: 2rem;
+        width: 100%;
     }}
 
-    /* Styling für die Modus-Buttons */
+    /* Modus Buttons oben */
     .stButton>button {{
         border-radius: 5px;
         background-color: rgba(255, 255, 255, 0.15);
         color: white;
         border: none;
         font-weight: bold;
-        padding: 5px 15px;
+    }}
+
+    /* Spezifisches Styling für den START/STOP Button */
+    div.stButton > button[kind="primary"], 
+    div.stButton > button:last-child {{
+        background-color: white !important;
+        color: {st.session_state.bg_color} !important;
+        font-size: 25px !important;
+        font-weight: bold !important;
+        height: 60px !important;
+        width: 200px !important;
+        border: none !important;
+        box-shadow: rgba(0, 0, 0, 0.2) 0px 6px 0px;
+        margin: 0 auto;
+        display: block;
     }}
     
-    /* Der große Start/Stop Button */
-    .start-btn-container .stButton>button {{
-        background-color: white;
-        color: {st.session_state.bg_color};
-        font-size: 22px;
-        height: 55px;
-        width: 200px;
-        margin-top: 20px;
+    div.stButton > button:active {{
+        transform: translateY(4px);
+        box-shadow: none;
     }}
 
     .timer-text {{
@@ -69,8 +77,8 @@ st.markdown(f"""
         font-size: 120px; 
         color: white; 
         font-weight: bold;
-        line-height: 1;
-        margin: 30px 0;
+        margin: 20px 0;
+        font-family: 'Arial', sans-serif;
     }}
 
     .fixed-bottom {{
@@ -78,11 +86,10 @@ st.markdown(f"""
         bottom: 0;
         left: 0;
         width: 100%;
-        background-color: rgba(255, 255, 255, 0.9);
+        background-color: rgba(255, 255, 255, 0.95);
         padding: 10px;
         z-index: 1000;
-        display: flex;
-        justify-content: center;
+        box-shadow: 0px -5px 15px rgba(0,0,0,0.2);
     }}
     
     .spacer {{ margin-bottom: 300px; }}
@@ -92,29 +99,26 @@ st.markdown(f"""
 # --- HAUPTBEREICH ---
 st.markdown("<h2 style='text-align: center; color: white; opacity: 0.8;'>Pomodoro Wächter</h2>", unsafe_allow_html=True)
 
-# 1. Modus-Buttons in einem schmalen mittigen Container
-col_a, col_b, col_c = st.columns([2, 3, 2]) # Erzeugt seitlichen Leerraum
-
-with col_b:
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        if st.button("Pomodoro", use_container_width=True):
-            st.session_state.mode = "Pomodoro"
-            st.session_state.remaining_sec = 25 * 60
-            st.session_state.active = False
-            st.session_state.bg_color = "#2d5a27"
-    with m2:
-        if st.button("Short", use_container_width=True):
-            st.session_state.mode = "Short Break"
-            st.session_state.remaining_sec = 5 * 60
-            st.session_state.active = False
-            st.session_state.bg_color = "#457b9d" # Blau für Pausen (optional)
-    with m3:
-        if st.button("Long", use_container_width=True):
-            st.session_state.mode = "Long Break"
-            st.session_state.remaining_sec = 15 * 60
-            st.session_state.active = False
-            st.session_state.bg_color = "#457b9d"
+# 1. Modus-Buttons mittig
+m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
+with m_col1:
+    if st.button("Pomodoro", use_container_width=True):
+        st.session_state.mode = "Pomodoro"
+        st.session_state.remaining_sec = 25 * 60
+        st.session_state.active = False
+        st.session_state.bg_color = "#2d5a27"
+with m_col2:
+    if st.button("Short", use_container_width=True):
+        st.session_state.mode = "Short Break"
+        st.session_state.remaining_sec = 5 * 60
+        st.session_state.active = False
+        st.session_state.bg_color = "#457b9d"
+with m_col3:
+    if st.button("Long", use_container_width=True):
+        st.session_state.mode = "Long Break"
+        st.session_state.remaining_sec = 15 * 60
+        st.session_state.active = False
+        st.session_state.bg_color = "#457b9d"
 
 # Timer Logik
 if st.session_state.active and st.session_state.remaining_sec > 0:
@@ -122,27 +126,25 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
     st.session_state.remaining_sec -= (now - st.session_state.last_tick)
     st.session_state.last_tick = now
 
-# 2. Große Zeitanzeige
+# 2. Zeitanzeige
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
 
-# 3. Start / Stop Button (Zentriert und groß)
-st.markdown('<div class="start-btn-container">', unsafe_allow_html=True)
-col_l, col_btn, col_r = st.columns([3, 1, 3])
-with col_btn:
+# 3. Start / Stop Button PERFEKT MITTIG
+# Wir nutzen eine einzelne Spalte in der Mitte für die Zentrierung
+_, btn_center, _ = st.columns([1, 1, 1])
+with btn_center:
     button_label = "STOP" if st.session_state.active else "START"
-    if st.button(button_label):
+    if st.button(button_label, use_container_width=True):
         st.session_state.active = not st.session_state.active
         st.session_state.last_tick = time.time()
-        # Bei Stop auf Alarmfarbe prüfen, sonst Reset
         if not st.session_state.active:
-             st.session_state.bg_color = "#2d5a27" if st.session_state.mode == "Pomodoro" else "#457b9d"
-st.markdown('</div>', unsafe_allow_html=True)
+             st.session_state.bg_color = "#2d5a27" if "Pomodoro" in st.session_state.mode else "#457b9d"
 
 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
 # --- AUTOMATISIERUNG ---
-if st.session_state.active and st.session_state.mode == "Pomodoro":
+if st.session_state.active and "Pomodoro" in st.session_state.mode:
     components.html(
         """
         <script>
@@ -163,7 +165,7 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
     )
 
 # --- KAMERA BEREICH ---
-if st.session_state.mode == "Pomodoro" and st.session_state.active:
+if "Pomodoro" in st.session_state.mode and st.session_state.active:
     st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
     c1, c2 = st.columns([2, 1])
     with c1:
