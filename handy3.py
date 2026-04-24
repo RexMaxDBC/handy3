@@ -28,7 +28,6 @@ if "bg_color" not in st.session_state:
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
 # --- CSS FÜR PERFEKTE ZENTRIERUNG ---
-# Achte darauf, dass dieser Block exakt so in den Anführungszeichen steht
 st.markdown(f"""
     <style>
     .stApp {{
@@ -36,51 +35,62 @@ st.markdown(f"""
         transition: background-color 0.3s ease;
     }}
     
+    /* Container für den gesamten Inhalt, um ihn schmaler und mittig zu halten */
+    .pomo-container {{
+        max-width: 500px;
+        margin: 0 auto;
+        text-align: center;
+    }}
+
     .title-text {{
         text-align: center;
         color: white;
         opacity: 0.9;
         font-weight: bold;
-        margin-top: -30px;
-        margin-bottom: 20px;
-        width: 100%;
-        display: block;
+        margin-bottom: 30px;
     }}
 
+    /* Modus Buttons */
     .stButton>button {{
         border-radius: 5px;
         background-color: rgba(255, 255, 255, 0.15);
         color: white;
         border: none;
         font-weight: bold;
+        transition: 0.2s;
+    }}
+    
+    .stButton>button:hover {{
+        background-color: rgba(255, 255, 255, 0.25);
+        color: white;
     }}
 
-    /* START/STOP Button Styling */
+    /* START/STOP Button */
     div.stButton > button:last-child {{
         background-color: white !important;
         color: {st.session_state.bg_color} !important;
         font-size: 25px !important;
         font-weight: bold !important;
-        height: 60px !important;
-        width: 200px !important;
+        height: 65px !important;
+        width: 220px !important;
         border: none !important;
         box-shadow: rgba(0, 0, 0, 0.2) 0px 6px 0px;
-        margin: 20px auto !important;
+        margin: 30px auto !important;
         display: block !important;
     }}
     
     div.stButton > button:active {{
         transform: translateY(4px);
-        box-shadow: none;
+        box-shadow: none !important;
     }}
 
     .timer-text {{
         text-align: center; 
-        font-size: 120px; 
+        font-size: 140px; /* Noch etwas größer für den Fokus */
         color: white; 
         font-weight: bold;
-        margin: 10px 0;
-        font-family: 'Arial', sans-serif;
+        margin: 20px 0;
+        font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;
     }}
 
     .fixed-bottom {{
@@ -94,14 +104,17 @@ st.markdown(f"""
         box-shadow: 0px -5px 15px rgba(0,0,0,0.2);
     }}
     
-    .spacer {{ margin-bottom: 300px; }}
+    .spacer {{ margin-bottom: 350px; }}
     </style>
     """, unsafe_allow_html=True)
+
+# Wir nutzen ein div zur visuellen Gruppierung im Code
+st.markdown("<div class='pomo-container'>", unsafe_allow_html=True)
 
 # --- HAUPTBEREICH ---
 st.markdown("<h2 class='title-text'>Pomodoro Wächter</h2>", unsafe_allow_html=True)
 
-# 1. Modus-Buttons mittig
+# 1. Modus-Buttons (Enger zusammen)
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
 with m_col1:
     if st.button("Pomodoro", use_container_width=True):
@@ -128,13 +141,12 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
     st.session_state.remaining_sec -= (now - st.session_state.last_tick)
     st.session_state.last_tick = now
 
-# 2. Zeitanzeige
+# 2. Zeitanzeige (Groß und Zentriert)
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
 
 # 3. Start / Stop Button
-# Wir nutzen Columns, um den Button in der Mitte zu halten
-_, btn_center, _ = st.columns([1, 1, 1])
+_, btn_center, _ = st.columns([0.5, 1, 0.5])
 with btn_center:
     button_label = "STOP" if st.session_state.active else "START"
     if st.button(button_label, use_container_width=True):
@@ -143,9 +155,10 @@ with btn_center:
         if not st.session_state.active:
              st.session_state.bg_color = "#2d5a27" if "Pomodoro" in st.session_state.mode else "#457b9d"
 
+st.markdown("</div>", unsafe_allow_html=True)
 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
-# --- AUTOMATISIERUNG (JS) ---
+# --- AUTOMATISIERUNG ---
 if st.session_state.active and "Pomodoro" in st.session_state.mode:
     components.html(
         """
