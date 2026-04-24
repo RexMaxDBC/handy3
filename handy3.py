@@ -27,7 +27,7 @@ if "bg_color" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS FÜR PERFEKTE ZENTRIERUNG UND KASTEN UM TITEL ---
+# --- CSS FÜR PERFEKTE ZENTRIERUNG UND GRAUEN KASTEN ---
 st.markdown(f"""
     <style>
     .stApp {{
@@ -35,7 +35,7 @@ st.markdown(f"""
         transition: background-color 0.3s ease;
     }}
     
-    /* Container für die Überschrift - Mit hellgrünem Kasten */
+    /* Container für die Überschrift - Jetzt in Hellgrau */
     .header-container {{
         width: 100%;
         display: flex;
@@ -43,18 +43,18 @@ st.markdown(f"""
         align-items: center;
         margin-top: -50px; 
         margin-bottom: 30px;
-        /* Neuer Kasten */
-        border: 4px solid #7CFC00; /* Hellgrüner Rand */
-        border-radius: 15px;      /* Abgerundete Ecken */
-        padding: 10px 20px;       /* Innenabstand */
-        background-color: rgba(124, 252, 0, 0.1); /* Sehr dezenter hellgrüner Hintergrund */
+        /* Grauer Kasten */
+        border: 2px solid #D3D3D3; /* Hellgrauer Rand, etwas dünner für Eleganz */
+        border-radius: 12px;       /* Leicht abgerundet */
+        padding: 8px 25px;         /* Innenabstand */
+        background-color: rgba(211, 211, 211, 0.1); /* Sehr dezenter grauer Schimmer */
     }}
 
     .title-text {{
         color: white;
-        opacity: 0.9;
+        opacity: 0.95;
         font-weight: bold;
-        font-size: 2.8rem;
+        font-size: 2.6rem;
         text-align: center;
         margin: 0;
         padding: 0;
