@@ -35,19 +35,26 @@ st.markdown(f"""
         transition: background-color 0.3s ease;
     }}
     
-    /* Container für den gesamten Inhalt, um ihn schmaler und mittig zu halten */
-    .pomo-container {{
-        max-width: 500px;
-        margin: 0 auto;
-        text-align: center;
+    /* Container für die Überschrift, um Streamlit-Offsets zu umgehen */
+    .header-container {{
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: -50px; /* Zieht den Titel etwas höher */
+        margin-bottom: 20px;
     }}
 
     .title-text {{
-        text-align: center;
         color: white;
         opacity: 0.9;
         font-weight: bold;
-        margin-bottom: 30px;
+        font-size: 2.5rem;
+        text-align: center;
+        margin: 0;
+        padding: 0;
+        border-bottom: 2px solid rgba(255,255,255,0.1); /* Eleganter Unterstrich */
+        padding-bottom: 10px;
     }}
 
     /* Modus Buttons */
@@ -57,14 +64,8 @@ st.markdown(f"""
         color: white;
         border: none;
         font-weight: bold;
-        transition: 0.2s;
     }}
     
-    .stButton>button:hover {{
-        background-color: rgba(255, 255, 255, 0.25);
-        color: white;
-    }}
-
     /* START/STOP Button */
     div.stButton > button:last-child {{
         background-color: white !important;
@@ -86,10 +87,10 @@ st.markdown(f"""
 
     .timer-text {{
         text-align: center; 
-        font-size: 140px; /* Noch etwas größer für den Fokus */
+        font-size: 140px; 
         color: white; 
         font-weight: bold;
-        margin: 20px 0;
+        margin: 10px 0;
         font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif;
     }}
 
@@ -108,13 +109,11 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# Wir nutzen ein div zur visuellen Gruppierung im Code
-st.markdown("<div class='pomo-container'>", unsafe_allow_html=True)
-
 # --- HAUPTBEREICH ---
-st.markdown("<h2 class='title-text'>Pomodoro Wächter</h2>", unsafe_allow_html=True)
+# Die Überschrift wird jetzt in einen dedizierten Header-Container gepackt
+st.markdown("<div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div>", unsafe_allow_html=True)
 
-# 1. Modus-Buttons (Enger zusammen)
+# 1. Modus-Buttons
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
 with m_col1:
     if st.button("Pomodoro", use_container_width=True):
@@ -141,7 +140,7 @@ if st.session_state.active and st.session_state.remaining_sec > 0:
     st.session_state.remaining_sec -= (now - st.session_state.last_tick)
     st.session_state.last_tick = now
 
-# 2. Zeitanzeige (Groß und Zentriert)
+# 2. Zeitanzeige
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
 
@@ -155,7 +154,6 @@ with btn_center:
         if not st.session_state.active:
              st.session_state.bg_color = "#2d5a27" if "Pomodoro" in st.session_state.mode else "#457b9d"
 
-st.markdown("</div>", unsafe_allow_html=True)
 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
 
 # --- AUTOMATISIERUNG ---
