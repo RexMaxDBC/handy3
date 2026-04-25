@@ -25,17 +25,15 @@ if "cam_key" not in st.session_state:
 if "bg_color" not in st.session_state:
     st.session_state.bg_color = "#2d5a27" 
 
-# NEU: Session State für das Lernziel
-if "subject" not in st.session_state:
-    st.session_state.subject = ""
-if "target_sessions" not in st.session_state:
-    st.session_state.target_sessions = 1
-if "current_sessions" not in st.session_state:
-    st.session_state.current_sessions = 0
+# NEU: Struktur für mehrere Fächer
+if "tasks" not in st.session_state:
+    st.session_state.tasks = {} # Format: {"Physik": [erledigt, ziel]}
+if "selected_task" not in st.session_state:
+    st.session_state.selected_task = None
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS ---
+# --- CSS (OPTIMIERTES LAYOUT) ---
 st.markdown(f"""
 <style>
     .stApp {{
@@ -44,14 +42,7 @@ st.markdown(f"""
     }}
     
     .block-container {{
-        padding-top: 4rem !important;
-    }}
-
-    .header-wrapper {{
-        display: flex;
-        justify-content: center;
-        width: 100%;
-        margin-bottom: 30px;
+        padding-top: 3rem !important;
     }}
 
     .header-container {{
@@ -61,62 +52,53 @@ st.markdown(f"""
         display: flex;
         justify-content: center;
         align-items: center;
-        padding: 0 40px;
-        min-width: 320px;
-        height: 80px;
+        margin: 0 auto 30px auto;
+        padding: 10px;
+        width: fit-content;
+        min-width: 300px;
     }}
 
     .title-text {{
         color: white !important;
         font-weight: bold !important;
-        font-size: 2.2rem !important;
+        font-size: 2rem !important;
         margin: 0 !important;
-        line-height: 80px !important;
-        text-align: center;
     }}
 
-    /* Eingabefelder Styling */
-    .stTextInput>div>div>input, .stNumberInput>div>div>input {{
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        color: white !important;
-        border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    }}
-
-    .target-display {{
-        text-align: center;
-        color: white;
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin-top: 10px;
-        background: rgba(0,0,0,0.1);
+    /* Task Card */
+    .task-card {{
+        background: rgba(255, 255, 255, 0.1);
+        padding: 15px;
         border-radius: 10px;
-        padding: 10px;
+        border-left: 5px solid white;
+        margin-bottom: 20px;
+        color: white;
     }}
 
     .timer-text {{
         text-align: center; 
-        font-size: 120px; 
+        font-size: 110px; 
         color: white; 
         font-weight: bold;
-        margin: 10px 0;
+        line-height: 1;
+        margin: 20px 0;
     }}
 
-    .stButton>button {{
-        border-radius: 6px;
-        background-color: rgba(255, 255, 255, 0.15);
-        color: white;
-        border: none;
+    /* Buttons */
+    div.stButton > button {{
+        border-radius: 8px;
+        font-weight: bold;
     }}
     
     div.stButton > button:last-child {{
         background-color: white !important;
         color: {st.session_state.bg_color} !important;
-        font-size: 24px !important;
-        height: 60px !important;
-        width: 200px !important;
-        margin: 20px auto !important;
+        font-size: 22px !important;
+        height: 55px !important;
+        width: 180px !important;
+        margin: 10px auto !important;
         display: block !important;
-        box-shadow: rgba(0, 0, 0, 0.2) 0px 5px 0px;
+        box-shadow: 0px 5px 0px rgba(0,0,0,0.2);
     }}
 
     .fixed-bottom {{
@@ -132,26 +114,34 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --- HEADER ---
-st.markdown("""
-    <div class='header-wrapper'>
-        <div class='header-container'>
-            <h1 class='title-text'>Pomodoro Wächter</h1>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+st.markdown("<div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div>", unsafe_allow_html=True)
 
-# --- NEU: ZIEL EINSTELLUNGEN ---
-col_subj, col_num = st.columns([2, 1])
-with col_subj:
-    st.session_state.subject = st.text_input("Was lernst du?", value=st.session_state.subject, placeholder="z.B. Physik")
-with col_num:
-    st.session_state.target_sessions = st.number_input("Einheiten", min_value=1, value=st.session_state.target_sessions)
+# --- TASK MANAGEMENT ---
+with st.expander("➕ Neues Fach hinzufügen / Verwalten", expanded=not st.session_state.tasks):
+    c1, c2, c3 = st.columns([2, 1, 1])
+    new_subject = c1.text_input("Fachname", placeholder="z.B. Physik")
+    new_target = c2.number_input("Ziel (Pomodoros)", min_value=1, value=4)
+    if c3.button("Hinzufügen", use_container_width=True):
+        if new_subject:
+            st.session_state.tasks[new_subject] = [0, new_target]
+            st.rerun()
 
-# Fortschrittsanzeige
-if st.session_state.subject:
+# --- TASK AUSWAHL & ANZEIGE ---
+if st.session_state.tasks:
+    st.session_state.selected_task = st.selectbox(
+        "Aktuelles Lernprojekt wählen:", 
+        options=list(st.session_state.tasks.keys()),
+        index=0 if st.session_state.selected_task is None else list(st.session_state.tasks.keys()).index(st.session_state.selected_task)
+    )
+    
+    current_task = st.session_state.selected_task
+    done, target = st.session_state.tasks[current_task]
+    
     st.markdown(f"""
-        <div class='target-display'>
-            📚 {st.session_state.subject}: {st.session_state.current_sessions} / {st.session_state.target_sessions} erledigt
+        <div class='task-card'>
+            <small>AKTIVES PROJEKT</small><br>
+            <b style='font-size: 1.5rem;'>{current_task}</b><br>
+            Fortschritt: {done} von {target} Einheiten erledigt
         </div>
     """, unsafe_allow_html=True)
 
@@ -161,41 +151,37 @@ with m_col1:
     if st.button("Pomodoro", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Pomodoro", 25*60, "#2d5a27"
 with m_col2:
-    if st.button("Short", use_container_width=True):
+    if st.button("Kurze Pause", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Short Break", 5*60, "#457b9d"
 with m_col3:
-    if st.button("Long", use_container_width=True):
+    if st.button("Lange Pause", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Long Break", 15*60, "#457b9d"
 
 # --- TIMER LOGIK ---
 if st.session_state.active:
     now = time.time()
-    elapsed = now - st.session_state.last_tick
-    st.session_state.remaining_sec -= elapsed
+    st.session_state.remaining_sec -= (now - st.session_state.last_tick)
     st.session_state.last_tick = now
 
-    # Wenn Timer abgelaufen ist
     if st.session_state.remaining_sec <= 0:
         st.session_state.active = False
         st.session_state.remaining_sec = 0
-        # Nur hochzählen, wenn wir im Pomodoro Modus waren
-        if st.session_state.mode == "Pomodoro":
-            st.session_state.current_sessions += 1
-            st.balloons() # Kleiner Erfolgseffekt
+        if st.session_state.mode == "Pomodoro" and st.session_state.selected_task:
+            st.session_state.tasks[st.session_state.selected_task][0] += 1
+            st.balloons()
         st.rerun()
 
-# Timer Anzeige
+# Anzeige
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
 
-# Control Button
 _, btn_center, _ = st.columns([0.5, 1, 0.5])
 with btn_center:
     if st.button("STOP" if st.session_state.active else "START", use_container_width=True):
         st.session_state.active = not st.session_state.active
         st.session_state.last_tick = time.time()
 
-# --- KAMERA & KI ---
+# --- KI & KAMERA ---
 if st.session_state.active and st.session_state.mode == "Pomodoro":
     components.html("<script>setInterval(() => { const b = Array.from(window.parent.document.querySelectorAll('button')).find(x => x.innerText.includes('Photo')); if(b) b.click(); }, 5000);</script>", height=0)
     st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
