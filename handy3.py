@@ -27,13 +27,13 @@ if "bg_color" not in st.session_state:
 
 # Task-Struktur
 if "tasks" not in st.session_state:
-    st.session_state.tasks = {} # {"Name": {"done": 0, "target": 4}}
+    st.session_state.tasks = {} 
 if "selected_task" not in st.session_state:
     st.session_state.selected_task = None
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS (DESIGN OPTIMIERUNG) ---
+# --- CSS ---
 st.markdown(f"""
 <style>
     .stApp {{
@@ -45,7 +45,6 @@ st.markdown(f"""
         padding-top: 4rem !important;
     }}
 
-    /* Header bleibt wie gewünscht */
     .header-container {{
         border: 2px solid #D3D3D3;
         border-radius: 12px;
@@ -68,22 +67,13 @@ st.markdown(f"""
         line-height: 80px !important;
     }}
 
-    /* NEUES TASK DESIGN */
-    .task-list-container {{
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 15px;
-        padding: 20px;
-        margin-top: 30px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-    }}
-
     .active-task-box {{
         background: rgba(255, 255, 255, 0.2);
         border: 2px solid #D3D3D3;
         box-shadow: 0 0 15px rgba(211, 211, 211, 0.3);
         border-radius: 10px;
         padding: 15px;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
         color: white;
     }}
 
@@ -92,7 +82,7 @@ st.markdown(f"""
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 10px;
         padding: 10px;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
         color: rgba(255, 255, 255, 0.7);
     }}
 
@@ -111,7 +101,6 @@ st.markdown(f"""
         transition: width 0.5s ease;
     }}
 
-    /* Alte Elemente (Timer & Start/Stop) */
     .timer-text {{
         text-align: center; 
         font-size: 120px; 
@@ -146,7 +135,7 @@ st.markdown(f"""
 # --- HEADER ---
 st.markdown("<div class='header-wrapper'><div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div></div>", unsafe_allow_html=True)
 
-# --- MODUS (ALTE ELEMENTE UNVERÄNDERT) ---
+# --- MODUS ---
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
 with m_col1:
     if st.button("Pomodoro", use_container_width=True):
@@ -180,10 +169,9 @@ with btn_center:
         st.session_state.active = not st.session_state.active
         st.session_state.last_tick = time.time()
 
-# --- NEUE ELEMENTE: TASK DASHBOARD ---
+# --- TASK DASHBOARD ---
 st.markdown("<hr style='opacity: 0.1'>", unsafe_allow_html=True)
 
-# Fach hinzufügen (Kompakt)
 with st.expander("📝 Neues Lern-Fach anlegen"):
     c1, c2, c3 = st.columns([2, 1, 1])
     name = c1.text_input("Name des Fachs", key="add_name")
@@ -195,17 +183,13 @@ with st.expander("📝 Neues Lern-Fach anlegen"):
                 st.session_state.selected_task = name
             st.rerun()
 
-# Die Task Liste
 if st.session_state.tasks:
     st.markdown("### Deine Lernziele")
-    for t_name, t_data in st.session_state.tasks.items():
+    for t_name, t_data in list(st.session_state.tasks.items()):
         is_active = (st.session_state.selected_task == t_name)
         css_class = "active-task-box" if is_active else "inactive-task-box"
-        
-        # Fortschrittsberechnung
         percent = min(100, (t_data["done"] / t_data["target"]) * 100)
         
-        # HTML Card
         st.markdown(f"""
             <div class='{css_class}'>
                 <div style='display: flex; justify-content: space-between; align-items: center;'>
@@ -218,18 +202,21 @@ if st.session_state.tasks:
             </div>
         """, unsafe_allow_html=True)
         
-        # Button zum Wechseln (nur wenn nicht aktiv)
+        col_actions1, col_actions2 = st.columns([1, 1])
         if not is_active:
-            if st.button(f"Zu {t_name} wechseln", key=f"switch_{t_name}", size="small"):
-                st.session_state.selected_task = t_name
+            with col_actions1:
+                if st.button(f"Zu {t_name} wechseln", key=f"switch_{t_name}"):
+                    st.session_state.selected_task = t_name
+                    st.rerun()
+        
+        with col_actions2:
+            if st.button(f"Entfernen: {t_name}", key=f"del_{t_name}"):
+                del st.session_state.tasks[t_name]
+                if st.session_state.selected_task == t_name:
+                    st.session_state.selected_task = next(iter(st.session_state.tasks)) if st.session_state.tasks else None
                 st.rerun()
-        elif is_active:
-             if st.button(f"Fach {t_name} entfernen", key=f"del_{t_name}", size="small"):
-                 del st.session_state.tasks[t_name]
-                 st.session_state.selected_task = next(iter(st.session_state.tasks)) if st.session_state.tasks else None
-                 st.rerun()
 
-# --- KI & KAMERA (UNVERÄNDERT) ---
+# --- KI & KAMERA ---
 if st.session_state.active and st.session_state.mode == "Pomodoro":
     components.html("<script>setInterval(() => { const b = Array.from(window.parent.document.querySelectorAll('button')).find(x => x.innerText.includes('Photo')); if(b) b.click(); }, 5000);</script>", height=0)
     st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
