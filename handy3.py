@@ -32,7 +32,7 @@ if "selected_task" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS (FINALES BUTTON-TUNING) ---
+# --- CSS (FIX FÜR DAS GRÜNE RECHTECK & BUTTONS) ---
 st.markdown(f"""
 <style>
     .stApp {{
@@ -62,7 +62,6 @@ st.markdown(f"""
         font-weight: bold !important;
         font-size: 2.2rem !important;
         margin: 0 !important;
-        line-height: 85px !important;
     }}
 
     /* Task Cards */
@@ -85,20 +84,19 @@ st.markdown(f"""
         color: rgba(255, 255, 255, 0.7);
     }}
 
-    /* EXAKTES TUNING FÜR DEN SPEICHERN-BUTTON */
-    div[data-testid="stExpander"] button {{
+    /* CLEAN FIX FÜR DIE EINGABEZEILE (KEIN GRÜNES RECHTECK MEHR) */
+    [data-testid="stExpander"] .stButton {{
+        padding-top: 28px; /* Schiebt nur den Button-Container runter, nicht den Inhalt */
+    }}
+    
+    [data-testid="stExpander"] button {{
         height: 38px !important;
-        min-height: 38px !important;
-        max-height: 38px !important;
-        padding: 0px 20px !important;
-        margin-top: 28px !important; /* Richtet ihn an den Inputs aus */
-        line-height: 38px !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
+        border: none !important;
+        background-color: white !important;
+        color: black !important;
     }}
 
-    /* Timer & Haupt-Button */
+    /* Timer Design */
     .timer-text {{
         text-align: center; 
         font-size: 120px; 
@@ -107,7 +105,7 @@ st.markdown(f"""
         margin: 10px 0;
     }}
 
-    /* Start/Stop Button unten */
+    /* Haupt-Start-Button */
     div.stMainBlockContainer > div:nth-child(7) button {{
         background-color: white !important;
         color: {st.session_state.bg_color} !important;
@@ -116,8 +114,8 @@ st.markdown(f"""
         width: 200px !important;
         margin: 20px auto !important;
         display: block !important;
-        box-shadow: 0px 5px 0px rgba(0,0,0,0.2);
         border: none !important;
+        box-shadow: 0px 5px 0px rgba(0,0,0,0.2);
     }}
 
     .fixed-bottom {{
@@ -138,15 +136,15 @@ st.markdown("<div class='header-container'><h1 class='title-text'>Pomodoro Wäch
 # --- MODUS ---
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
 with m_col1:
-    if st.button("Pomodoro", key="pomo_btn", use_container_width=True):
+    if st.button("Pomodoro", key="p_btn", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Pomodoro", 25*60, "#2d5a27"
         st.session_state.active = False
 with m_col2:
-    if st.button("Kurze Pause", key="short_btn", use_container_width=True):
+    if st.button("Kurze Pause", key="s_btn", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Short Break", 5*60, "#457b9d"
         st.session_state.active = False
 with m_col3:
-    if st.button("Lange Pause", key="long_btn", use_container_width=True):
+    if st.button("Lange Pause", key="l_btn", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Long Break", 15*60, "#457b9d"
         st.session_state.active = False
 
@@ -168,14 +166,14 @@ st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow
 
 _, btn_center, _ = st.columns([0.5, 1, 0.5])
 with btn_center:
-    if st.button("STOP" if st.session_state.active else "START", key="main_control", use_container_width=True):
+    if st.button("STOP" if st.session_state.active else "START", key="timer_control", use_container_width=True):
         st.session_state.active = not st.session_state.active
         st.session_state.last_tick = time.time()
 
 # --- TASK DASHBOARD ---
 st.markdown("<hr style='opacity: 0.1'>", unsafe_allow_html=True)
 
-if st.session_state.selected_task is not None:
+if st.session_state.selected_task:
     if st.button("❌ Auswahl aufheben"):
         st.session_state.selected_task = None
         st.session_state.active = False
@@ -186,11 +184,12 @@ else:
     st.markdown("<div style='text-align: center; color: white; opacity: 0.8; margin-bottom: 10px;'>✨ Freies Lernen aktiv</div>", unsafe_allow_html=True)
 
 with st.expander("📝 Neues Lern-Fach anlegen"):
+    # Layout-Fix: Wir nutzen container-width und ein besseres Spaltenverhältnis
     c1, c2, c3 = st.columns([3, 1, 1]) 
     name = c1.text_input("Name", key="add_name")
     target = c2.number_input("Ziel", min_value=1, value=4, key="add_target")
     with c3:
-        if st.button("Speichern", key="save_btn"):
+        if st.button("Speichern", key="save_btn", use_container_width=True):
             if name:
                 st.session_state.tasks[name] = {"done": 0, "target": target}
                 st.rerun()
@@ -217,14 +216,14 @@ if st.session_state.tasks:
         b1, b2, _ = st.columns([0.2, 0.2, 0.6])
         if not is_active:
             with b1:
-                if st.button("Start", key=f"sw_{t_name}"):
+                if st.button("Start", key=f"sw_{t_name}", use_container_width=True):
                     st.session_state.selected_task = t_name
                     st.session_state.active = False
                     if st.session_state.mode == "Pomodoro":
                         st.session_state.remaining_sec = 25 * 60
                     st.rerun()
         with b2:
-            if st.button("Löschen", key=f"dl_{t_name}"):
+            if st.button("Löschen", key=f"dl_{t_name}", use_container_width=True):
                 del st.session_state.tasks[t_name]
                 if st.session_state.selected_task == t_name:
                     st.session_state.selected_task = None
