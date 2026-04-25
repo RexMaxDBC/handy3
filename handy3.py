@@ -93,6 +93,16 @@ st.markdown(f"""
         color: rgba(255, 255, 255, 0.7);
     }}
 
+    .no-task-box {{
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px dashed rgba(255, 255, 255, 0.4);
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 15px;
+        text-align: center;
+        color: white;
+    }}
+
     .progress-bar-bg {{
         background: rgba(0,0,0,0.2);
         border-radius: 5px;
@@ -166,9 +176,12 @@ if st.session_state.active:
     if st.session_state.remaining_sec <= 0:
         st.session_state.active = False
         st.session_state.remaining_sec = 0
+        # Nur hochzählen, wenn ein Fach ausgewählt ist
         if st.session_state.mode == "Pomodoro" and st.session_state.selected_task:
             st.session_state.tasks[st.session_state.selected_task]["done"] += 1
             st.balloons()
+        elif st.session_state.mode == "Pomodoro":
+            st.toast("Pomodoro beendet! (Kein Fach zugeordnet)")
         st.rerun()
 
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
@@ -183,6 +196,17 @@ with btn_center:
 # --- TASK DASHBOARD ---
 st.markdown("<hr style='opacity: 0.1'>", unsafe_allow_html=True)
 
+# Anzeige wenn KEIN Fach aktiv ist
+if st.session_state.selected_task is None:
+    st.markdown("<div class='no-task-box'>✨ Freies Lernen (kein Fach ausgewählt)</div>", unsafe_allow_html=True)
+else:
+    # Button um die Auswahl aufzuheben
+    if st.button("❌ Fach-Auswahl aufheben (Freies Lernen)"):
+        st.session_state.selected_task = None
+        st.session_state.active = False
+        st.session_state.remaining_sec = 25 * 60 if st.session_state.mode == "Pomodoro" else st.session_state.remaining_sec
+        st.rerun()
+
 with st.expander("📝 Neues Lern-Fach anlegen"):
     c1, c2, c3 = st.columns([3, 1, 1]) 
     name = c1.text_input("Name des Fachs", key="add_name")
@@ -192,8 +216,8 @@ with st.expander("📝 Neues Lern-Fach anlegen"):
         if st.button("Speichern", key="save_btn"):
             if name:
                 st.session_state.tasks[name] = {"done": 0, "target": target}
-                if st.session_state.selected_task is None:
-                    st.session_state.selected_task = name
+                # Optional: Sofort aktivieren beim Erstellen
+                # st.session_state.selected_task = name
                 st.rerun()
 
 if st.session_state.tasks:
@@ -224,17 +248,13 @@ if st.session_state.tasks:
                     st.session_state.active = False
                     if st.session_state.mode == "Pomodoro":
                         st.session_state.remaining_sec = 25 * 60
-                    elif st.session_state.mode == "Short Break":
-                        st.session_state.remaining_sec = 5 * 60
-                    else:
-                        st.session_state.remaining_sec = 15 * 60
                     st.rerun()
         
         with col_actions[1]:
             if st.button(f"Löschen", key=f"del_{t_name}"):
                 del st.session_state.tasks[t_name]
                 if st.session_state.selected_task == t_name:
-                    st.session_state.selected_task = next(iter(st.session_state.tasks)) if st.session_state.tasks else None
+                    st.session_state.selected_task = None
                 st.rerun()
 
 # --- KI & KAMERA ---
