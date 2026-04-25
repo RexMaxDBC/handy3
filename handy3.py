@@ -32,7 +32,7 @@ if "selected_task" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS ---
+# --- CSS (FINALES BUTTON-TUNING) ---
 st.markdown(f"""
 <style>
     .stApp {{
@@ -44,13 +44,6 @@ st.markdown(f"""
         padding-top: 5rem !important;
     }}
 
-    .header-wrapper {{
-        display: flex;
-        justify-content: center;
-        width: 100%;
-        margin-bottom: 40px;
-    }}
-
     .header-container {{
         border: 2px solid #D3D3D3;
         border-radius: 12px;
@@ -58,6 +51,7 @@ st.markdown(f"""
         display: flex;
         justify-content: center;
         align-items: center;
+        margin: 0 auto 40px auto;
         padding: 0 40px;
         min-width: 320px;
         height: 85px;
@@ -71,6 +65,7 @@ st.markdown(f"""
         line-height: 85px !important;
     }}
 
+    /* Task Cards */
     .active-task-box {{
         background: rgba(255, 255, 255, 0.2);
         border: 2px solid #D3D3D3;
@@ -90,31 +85,17 @@ st.markdown(f"""
         color: rgba(255, 255, 255, 0.7);
     }}
 
-    .no-task-box {{
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px dashed rgba(255, 255, 255, 0.4);
-        border-radius: 10px;
-        padding: 12px;
-        margin-bottom: 15px;
-        text-align: center;
-        color: white;
+    /* Spezifisches Button Tuning für "Speichern" */
+    div[data-testid="stExpander"] button[kind="secondary"] {{
+        height: 38px !important;
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+        margin-top: 28px !important;
+        width: auto !important;
+        min-width: 100px !important;
     }}
 
-    .progress-bar-bg {{
-        background: rgba(0,0,0,0.2);
-        border-radius: 5px;
-        height: 8px;
-        width: 100%;
-        margin: 10px 0;
-    }}
-
-    .progress-bar-fill {{
-        background: #D3D3D3;
-        height: 100%;
-        border-radius: 5px;
-        transition: width 0.5s ease;
-    }}
-
+    /* Timer & Haupt-Button */
     .timer-text {{
         text-align: center; 
         font-size: 120px; 
@@ -123,11 +104,6 @@ st.markdown(f"""
         margin: 10px 0;
     }}
 
-    div.stButton > button {{
-        border-radius: 8px;
-    }}
-
-    /* Der große Start-Button */
     div.stButton > button:last-child {{
         background-color: white !important;
         color: {st.session_state.bg_color} !important;
@@ -153,7 +129,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # --- HEADER ---
-st.markdown("<div class='header-wrapper'><div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div></div>", unsafe_allow_html=True)
+st.markdown("<div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div>", unsafe_allow_html=True)
 
 # --- MODUS ---
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
@@ -195,23 +171,23 @@ with btn_center:
 # --- TASK DASHBOARD ---
 st.markdown("<hr style='opacity: 0.1'>", unsafe_allow_html=True)
 
-if st.session_state.selected_task is None:
-    st.markdown("<div class='no-task-box'>✨ Freies Lernen (kein Fach ausgewählt)</div>", unsafe_allow_html=True)
-else:
+if st.session_state.selected_task is not None:
     if st.button("❌ Auswahl aufheben"):
         st.session_state.selected_task = None
         st.session_state.active = False
         if st.session_state.mode == "Pomodoro":
             st.session_state.remaining_sec = 25 * 60
         st.rerun()
+else:
+    st.markdown("<div style='text-align: center; color: white; opacity: 0.8; margin-bottom: 10px;'>✨ Freies Lernen aktiv</div>", unsafe_allow_html=True)
 
 with st.expander("📝 Neues Lern-Fach anlegen"):
-    c1, c2, c3 = st.columns([3, 1, 1.2]) 
-    name = c1.text_input("Name des Fachs", key="add_name")
+    c1, c2, c3 = st.columns([3, 1, 1]) 
+    name = c1.text_input("Name", key="add_name")
     target = c2.number_input("Ziel", min_value=1, value=4, key="add_target")
     with c3:
-        st.write("##")
-        if st.button("Speichern", key="save_btn", use_container_width=True):
+        # Der Button wird durch das CSS oben klein gehalten und positioniert
+        if st.button("Speichern", key="save_btn"):
             if name:
                 st.session_state.tasks[name] = {"done": 0, "target": target}
                 st.rerun()
@@ -226,28 +202,26 @@ if st.session_state.tasks:
         st.markdown(f"""
             <div class='{css_class}'>
                 <div style='display: flex; justify-content: space-between; align-items: center;'>
-                    <b style='font-size: 1.2rem;'>{t_name} {' (Aktiv)' if is_active else ''}</b>
-                    <span style='font-family: monospace; font-weight: bold;'>{t_data["done"]} / {t_data["target"]}</span>
+                    <b style='font-size: 1.1rem;'>{t_name} {' (Aktiv)' if is_active else ''}</b>
+                    <span style='font-family: monospace;'>{t_data["done"]} / {t_data["target"]}</span>
                 </div>
-                <div class='progress-bar-bg'>
-                    <div class='progress-bar-fill' style='width: {percent}%'></div>
+                <div style='background: rgba(0,0,0,0.2); border-radius: 5px; height: 6px; width: 100%; margin-top: 8px;'>
+                    <div style='background: #D3D3D3; height: 100%; border-radius: 5px; width: {percent}%'></div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
         
-        btn_col1, btn_col2, _ = st.columns([0.3, 0.3, 0.4])
-        
+        b1, b2, _ = st.columns([0.2, 0.2, 0.6])
         if not is_active:
-            with btn_col1:
-                if st.button(f"Start", key=f"switch_{t_name}", use_container_width=True):
+            with b1:
+                if st.button("Start", key=f"sw_{t_name}"):
                     st.session_state.selected_task = t_name
                     st.session_state.active = False
                     if st.session_state.mode == "Pomodoro":
                         st.session_state.remaining_sec = 25 * 60
                     st.rerun()
-        
-        with btn_col2:
-            if st.button(f"Löschen", key=f"del_{t_name}", use_container_width=True):
+        with b2:
+            if st.button("Löschen", key=f"dl_{t_name}"):
                 del st.session_state.tasks[t_name]
                 if st.session_state.selected_task == t_name:
                     st.session_state.selected_task = None
