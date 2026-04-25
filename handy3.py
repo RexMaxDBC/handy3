@@ -85,14 +85,17 @@ st.markdown(f"""
         color: rgba(255, 255, 255, 0.7);
     }}
 
-    /* Spezifisches Button Tuning für "Speichern" */
-    div[data-testid="stExpander"] button[kind="secondary"] {{
+    /* EXAKTES TUNING FÜR DEN SPEICHERN-BUTTON */
+    div[data-testid="stExpander"] button {{
         height: 38px !important;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        margin-top: 28px !important;
-        width: auto !important;
-        min-width: 100px !important;
+        min-height: 38px !important;
+        max-height: 38px !important;
+        padding: 0px 20px !important;
+        margin-top: 28px !important; /* Richtet ihn an den Inputs aus */
+        line-height: 38px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }}
 
     /* Timer & Haupt-Button */
@@ -104,7 +107,8 @@ st.markdown(f"""
         margin: 10px 0;
     }}
 
-    div.stButton > button:last-child {{
+    /* Start/Stop Button unten */
+    div.stMainBlockContainer > div:nth-child(7) button {{
         background-color: white !important;
         color: {st.session_state.bg_color} !important;
         font-size: 24px !important;
@@ -113,7 +117,7 @@ st.markdown(f"""
         margin: 20px auto !important;
         display: block !important;
         box-shadow: 0px 5px 0px rgba(0,0,0,0.2);
-        border: none;
+        border: none !important;
     }}
 
     .fixed-bottom {{
@@ -134,15 +138,15 @@ st.markdown("<div class='header-container'><h1 class='title-text'>Pomodoro Wäch
 # --- MODUS ---
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
 with m_col1:
-    if st.button("Pomodoro", use_container_width=True):
+    if st.button("Pomodoro", key="pomo_btn", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Pomodoro", 25*60, "#2d5a27"
         st.session_state.active = False
 with m_col2:
-    if st.button("Kurze Pause", use_container_width=True):
+    if st.button("Kurze Pause", key="short_btn", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Short Break", 5*60, "#457b9d"
         st.session_state.active = False
 with m_col3:
-    if st.button("Lange Pause", use_container_width=True):
+    if st.button("Lange Pause", key="long_btn", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Long Break", 15*60, "#457b9d"
         st.session_state.active = False
 
@@ -164,7 +168,7 @@ st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow
 
 _, btn_center, _ = st.columns([0.5, 1, 0.5])
 with btn_center:
-    if st.button("STOP" if st.session_state.active else "START", use_container_width=True):
+    if st.button("STOP" if st.session_state.active else "START", key="main_control", use_container_width=True):
         st.session_state.active = not st.session_state.active
         st.session_state.last_tick = time.time()
 
@@ -186,7 +190,6 @@ with st.expander("📝 Neues Lern-Fach anlegen"):
     name = c1.text_input("Name", key="add_name")
     target = c2.number_input("Ziel", min_value=1, value=4, key="add_target")
     with c3:
-        # Der Button wird durch das CSS oben klein gehalten und positioniert
         if st.button("Speichern", key="save_btn"):
             if name:
                 st.session_state.tasks[name] = {"done": 0, "target": target}
