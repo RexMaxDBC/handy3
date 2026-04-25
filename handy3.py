@@ -33,7 +33,7 @@ if "selected_task" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- CSS (ALTE ELEMENTE + OPTIMIERTE TASKS) ---
+# --- CSS (KOMPLETTES STYLING) ---
 st.markdown(f"""
 <style>
     .stApp {{
@@ -42,7 +42,14 @@ st.markdown(f"""
     }}
     
     .block-container {{
-        padding-top: 4rem !important;
+        padding-top: 5rem !important;
+    }}
+
+    .header-wrapper {{
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        margin-bottom: 40px;
     }}
 
     .header-container {{
@@ -52,11 +59,9 @@ st.markdown(f"""
         display: flex;
         justify-content: center;
         align-items: center;
-        margin: 0 auto 30px auto;
-        padding: 10px;
-        width: fit-content;
-        min-width: 300px;
-        height: 80px;
+        padding: 0 40px;
+        min-width: 320px;
+        height: 85px;
     }}
 
     .title-text {{
@@ -64,7 +69,8 @@ st.markdown(f"""
         font-weight: bold !important;
         font-size: 2.2rem !important;
         margin: 0 !important;
-        line-height: 80px !important;
+        line-height: 85px !important;
+        text-align: center;
     }}
 
     /* Task Design */
@@ -110,7 +116,7 @@ st.markdown(f"""
         margin: 10px 0;
     }}
 
-    /* Der große Start-Button */
+    /* Großer START/STOP Button */
     div.stButton > button:last-child {{
         background-color: white !important;
         color: {st.session_state.bg_color} !important;
@@ -137,17 +143,20 @@ st.markdown(f"""
 # --- HEADER ---
 st.markdown("<div class='header-wrapper'><div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div></div>", unsafe_allow_html=True)
 
-# --- MODUS (UNVERÄNDERT) ---
+# --- MODUS-WAHL ---
 m_col1, m_col2, m_col3 = st.columns([1, 1, 1])
 with m_col1:
     if st.button("Pomodoro", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Pomodoro", 25*60, "#2d5a27"
+        st.session_state.active = False
 with m_col2:
     if st.button("Kurze Pause", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Short Break", 5*60, "#457b9d"
+        st.session_state.active = False
 with m_col3:
     if st.button("Lange Pause", use_container_width=True):
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Long Break", 15*60, "#457b9d"
+        st.session_state.active = False
 
 # --- TIMER LOGIK ---
 if st.session_state.active:
@@ -171,7 +180,7 @@ with btn_center:
         st.session_state.active = not st.session_state.active
         st.session_state.last_tick = time.time()
 
-# --- NEUES TASK DASHBOARD ---
+# --- TASK DASHBOARD ---
 st.markdown("<hr style='opacity: 0.1'>", unsafe_allow_html=True)
 
 with st.expander("📝 Neues Lern-Fach anlegen"):
@@ -210,8 +219,17 @@ if st.session_state.tasks:
         if not is_active:
             with col_actions[0]:
                 if st.button(f"Start", key=f"switch_{t_name}"):
+                    # RESET BEIM WECHSEL
                     st.session_state.selected_task = t_name
+                    st.session_state.active = False
+                    if st.session_state.mode == "Pomodoro":
+                        st.session_state.remaining_sec = 25 * 60
+                    elif st.session_state.mode == "Short Break":
+                        st.session_state.remaining_sec = 5 * 60
+                    else:
+                        st.session_state.remaining_sec = 15 * 60
                     st.rerun()
+        
         with col_actions[1]:
             if st.button(f"Löschen", key=f"del_{t_name}"):
                 del st.session_state.tasks[t_name]
@@ -219,7 +237,7 @@ if st.session_state.tasks:
                     st.session_state.selected_task = next(iter(st.session_state.tasks)) if st.session_state.tasks else None
                 st.rerun()
 
-# --- KI & KAMERA (UNVERÄNDERT) ---
+# --- KI & KAMERA ---
 if st.session_state.active and st.session_state.mode == "Pomodoro":
     components.html("<script>setInterval(() => { const b = Array.from(window.parent.document.querySelectorAll('button')).find(x => x.innerText.includes('Photo')); if(b) b.click(); }, 5000);</script>", height=0)
     st.markdown('<div class="fixed-bottom">', unsafe_allow_html=True)
