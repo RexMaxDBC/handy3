@@ -6,9 +6,10 @@ import os
 import base64
 import streamlit.components.v1 as components
 
-# --- KI SETUP ---
+# --- KI SETUP (Vortrainiertes Modell) ---
 @st.cache_resource
 def load_detector():
+    # Lädt das Facebook DETR Modell zur Objekterkennung
     return pipeline("object-detection", model="facebook/detr-resnet-50")
 
 detector = load_detector()
@@ -34,22 +35,29 @@ if "selected_task" not in st.session_state:
 
 st.set_page_config(page_title="Pomodoro Wächter", layout="centered")
 
-# --- SOUND FUNKTIONEN ---
+# --- SOUND FUNKTIONEN (Verbesserte Version) ---
 def play_alarm():
-    """Spielt den Star Wars Alarm ab."""
+    """Spielt den Star Wars Alarm ab und erzwingt das Abspielen im Browser."""
     if os.path.exists("batle-alarm-star-wars.mp3"):
         with open("batle-alarm-star-wars.mp3", "rb") as f:
             data = f.read()
             b64 = base64.b64encode(data).decode()
-            md = f"""
-                <audio id="alarm_sound" autoplay loop>
-                <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+            # Das JS sorgt dafür, dass das Audio-Element aktiv gestartet wird
+            audio_html = f"""
+                <audio id="alarm_sound" autoplay="true" loop="true">
+                    <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
                 </audio>
+                <script>
+                    var audio = window.parent.document.getElementById("alarm_sound");
+                    if (audio) {{
+                        audio.play().catch(e => console.log("Autoplay blockiert: " + e));
+                    }}
+                </script>
                 """
-            st.markdown(md, unsafe_allow_html=True)
+            st.markdown(audio_html, unsafe_allow_html=True)
 
 def stop_alarm():
-    """Stoppt das Audio-Element im Browser."""
+    """Stoppt das Audio-Element im Browser-Frontend."""
     stop_js = """
         <script>
         var audio = window.parent.document.getElementById("alarm_sound");
@@ -67,36 +75,29 @@ st.markdown(f"""
 <style>
     .stApp {{
         background-color: {st.session_state.bg_color};
-        transition: background-color 0.3s ease;
+        transition: background-color 0.5s ease;
     }}
     
-    .block-container {{
-        padding-top: 5rem !important;
-    }}
-
     .header-container {{
         border: 2px solid #D3D3D3;
         border-radius: 12px;
         background-color: rgba(211, 211, 211, 0.15);
         display: flex;
         justify-content: center;
-        align-items: center;
-        margin: 0 auto 40px auto;
-        padding: 0 40px;
-        min-width: 320px;
-        height: 85px;
+        padding: 15px;
+        margin-bottom: 30px;
     }}
 
     .title-text {{
-        color: white !important;
-        font-weight: bold !important;
-        font-size: 2.2rem !important;
-        margin: 0 !important;
+        color: white;
+        font-weight: bold;
+        font-size: 2.2rem;
+        margin: 0;
     }}
 
     .timer-text {{
         text-align: center; 
-        font-size: 120px; 
+        font-size: 110px; 
         color: white; 
         font-weight: bold;
         margin: 10px 0;
@@ -115,10 +116,10 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# --- UI ELEMENTE ---
+# --- HEADER ---
 st.markdown("<div class='header-container'><h1 class='title-text'>Pomodoro Wächter</h1></div>", unsafe_allow_html=True)
 
-# MODUS AUSWAHL
+# --- MODUS AUSWAHL ---
 m_col1, m_col2, m_col3 = st.columns(3)
 with m_col1:
     if st.button("Pomodoro", use_container_width=True):
@@ -133,7 +134,7 @@ with m_col3:
         st.session_state.mode, st.session_state.remaining_sec, st.session_state.bg_color = "Lange Pause", 15*60, "#457b9d"
         st.session_state.active = False
 
-# TIMER LOGIK
+# --- TIMER LOGIK ---
 if st.session_state.active:
     now = time.time()
     st.session_state.remaining_sec -= (now - st.session_state.last_tick)
@@ -146,16 +147,16 @@ if st.session_state.active:
 mins, secs = divmod(int(max(0, st.session_state.remaining_sec)), 60)
 st.markdown(f"<div class='timer-text'>{mins:02d}:{secs:02d}</div>", unsafe_allow_html=True)
 
-_, btn_center, _ = st.columns([0.5, 1, 0.5])
+_, btn_center, _ = st.columns([0.6, 1, 0.6])
 with btn_center:
     if st.button("STOP" if st.session_state.active else "START", use_container_width=True):
         st.session_state.active = not st.session_state.active
         st.session_state.last_tick = time.time()
         if not st.session_state.active:
-            stop_alarm() # Sofort stoppen, wenn User manuell Pause drückt
+            stop_alarm()
         st.rerun()
 
-# --- KI & KAMERA (DETR MODELL + SOUND) ---
+# --- KI SCANNER ---
 if st.session_state.active and st.session_state.mode == "Pomodoro":
     # Automatischer Foto-Trigger alle 5 Sekunden
     components.html("<script>if(!window.parent.pI) window.parent.pI = setInterval(() => { const b = Array.from(window.parent.document.querySelectorAll('button')).find(x => x.innerText.includes('Photo')); if(b) b.click(); }, 5000);</script>", height=0)
@@ -167,25 +168,26 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
     with c2:
         if img_file:
             img = Image.open(img_file)
-            # DETR Suche nach 'cell phone'
+            # Objekterkennung durchführen
             results = detector(img)
-            handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
+            # Prüfen, ob ein 'cell phone' erkannt wurde
+            handy_gefunden = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
             
-            if handy:
+            if handy_gefunden:
                 st.session_state.bg_color = "#ba4949" # Rot
                 st.error("HANDY ERKANNT!")
-                play_alarm() # Sound an
+                play_alarm()
             else:
                 st.session_state.bg_color = "#2d5a27" # Grün
                 st.success("FOKUS OK")
-                stop_alarm() # Sound aus
+                stop_alarm()
             
             st.session_state.cam_key += 1
             time.sleep(0.5)
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# Laufendes Update für den Timer
+# Timer-Update (Re-run)
 if st.session_state.active:
     time.sleep(0.1)
     st.rerun()
