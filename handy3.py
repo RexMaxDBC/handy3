@@ -9,7 +9,7 @@ import streamlit.components.v1 as components
 # --- KI SETUP (Vortrainiertes Modell) ---
 @st.cache_resource
 def load_detector():
-    # Nutzt das facebook/detr-resnet-50 Modell für Objekterkennung
+    # Lädt das facebook/detr-resnet-50 Modell für Objekterkennung
     return pipeline("object-detection", model="facebook/detr-resnet-50")
 
 detector = load_detector()
@@ -62,7 +62,7 @@ def stop_alarm():
         """
     components.html(stop_js, height=0)
 
-# --- CSS DESIGN (Inklusive Modal-Styling) ---
+# --- CSS DESIGN ---
 st.markdown(f"""
 <style>
     .stApp {{ background-color: {st.session_state.bg_color}; transition: background-color 0.8s ease; }}
@@ -92,7 +92,6 @@ if st.session_state.detail_task is not None:
     t = st.session_state.detail_task
     if t in st.session_state.tasks:
         task = st.session_state.tasks[t]
-        # Initialisierung der Felder falls nicht vorhanden
         if "stars" not in task: task["stars"] = 0
         if "comment" not in task: task["comment"] = ""
         
@@ -101,7 +100,6 @@ if st.session_state.detail_task is not None:
         pct_int = int(pct * 100)
 
         st.markdown("<div class='modal-overlay'>", unsafe_allow_html=True)
-        
         c_close, c_title = st.columns([1, 5])
         with c_close:
             if st.button("✕ Zu", use_container_width=True):
@@ -115,7 +113,6 @@ if st.session_state.detail_task is not None:
             <div class='progress-label'>{done} von {target} Sessions ({pct_int}%) {' 🎉 Ziel erreicht!' if pct >= 1.0 else ''}</div>
         """, unsafe_allow_html=True)
 
-        # Sterne
         st.markdown("<div style='color:white; font-weight:500; margin-bottom:6px;'>Meine Bewertung</div>", unsafe_allow_html=True)
         star_cols = st.columns(5)
         for i, col in enumerate(star_cols):
@@ -125,7 +122,6 @@ if st.session_state.detail_task is not None:
                 task["stars"] = 0 if task["stars"] == star_num else star_num
                 st.rerun()
 
-        # Kommentar
         new_comment = st.text_area("Notiz", value=task["comment"], placeholder="Was war heute schwierig?", label_visibility="collapsed", key=f"txt_{t}")
         if st.button("💾 Speichern", key=f"save_{t}"):
             task["comment"] = new_comment
@@ -218,7 +214,7 @@ with st.expander("📝 Lernfächer verwalten"):
             if st.session_state.selected_task == t_name: st.session_state.selected_task = None
             st.rerun()
 
-# --- KI SCANNER (Vortrainiertes Modell) ---
+# --- KI SCANNER (Fehlalarm-Schutz auf 0.90) ---
 if st.session_state.active and st.session_state.mode == "Pomodoro":
     components.html("<script>if(!window.parent.pI) window.parent.pI = setInterval(() => { const b = Array.from(window.parent.document.querySelectorAll('button')).find(x => x.innerText.includes('Photo')); if(b) b.click(); }, 6000);</script>", height=0)
     
@@ -230,18 +226,22 @@ if st.session_state.active and st.session_state.mode == "Pomodoro":
         if img_f:
             img = Image.open(img_f)
             results = detector(img)
-            handy = any(r['label'] == 'cell phone' and r['score'] > 0.5 for r in results)
-            if handy:
+            
+            # Höherer Score (0.90) verhindert Fehlalarme
+            handy_treffer = [r for r in results if r['label'] == 'cell phone' and r['score'] > 0.90]
+            
+            if handy_treffer:
+                top_score = max([r['score'] for r in handy_treffer])
                 st.session_state.bg_color = "#ba4949"
                 play_alarm()
-                st.error("HANDY ERKANNT!")
+                st.error(f"🚨 HANDY! ({round(top_score * 100)}%)")
             else:
                 st.session_state.bg_color = "#2d5a27"
                 stop_alarm()
-                st.success("FOKUS OKAY")
+                st.success("✅ FOKUS")
             
             st.session_state.cam_key += 1
-            time.sleep(1.0)
+            time.sleep(1.2) # Etwas mehr Zeit für die UI
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
